@@ -23,17 +23,24 @@ export function useSession() {
   const [session, setSession] = useState<SessionState | null>(null);
 
   useEffect(() => {
-    const id = generateSessionId();
-    const newSession = createSessionState(id);
-    setSession(newSession);
+    const storedId = localStorage.getItem('chatSessionId');
+    let id = storedId;
 
-    // Register session in Supabase — insert only, no PII
-    supabaseBrowser
-      .from('sessions')
-      .insert({ session_hash: id })
-      .then(({ error }) => {
-        if (error) console.error('Session init failed:', error.message);
-      });
+    if (!id) {
+      id = generateSessionId();
+      localStorage.setItem('chatSessionId', id);
+      
+      // Register NEW session in Supabase
+      supabaseBrowser
+        .from('sessions')
+        .insert({ session_id: id })
+        .then(({ error }) => {
+          if (error) console.error('Session init failed:', error.message);
+        });
+    }
+
+    const sessionState = createSessionState(id);
+    setSession(sessionState);
   }, []); // runs once on mount
 
   return { session, setSession };

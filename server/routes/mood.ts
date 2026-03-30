@@ -36,11 +36,11 @@ router.post('/submit', async (req, res) => {
     await supabaseServer
       .from('sessions')
       .update({ risk_score: riskScore, risk_tier: riskTier, last_active: new Date().toISOString() })
-      .eq('session_hash', sessionId);
+      .eq('session_id', sessionId);
 
     // Insert event
-    await supabaseServer.from('events').insert({
-      session_hash: sessionId,
+    await supabaseServer.from('session_events').insert({
+      session_id: sessionId,
       event_type: 'mood_checkin',
       sentiment_score: blendedScore,
       mood_emoji: emojiIndex,

@@ -19,7 +19,7 @@ router.post('/create', async (req, res) => {
 
     const { data, error } = await supabaseServer
       .from('sessions')
-      .insert({ session_hash: sessionId })
+      .insert({ session_id: sessionId })
       .select()
       .single();
 
@@ -31,6 +31,32 @@ router.post('/create', async (req, res) => {
     return res.status(201).json({ session: data });
   } catch (err) {
     console.error('Session endpoint error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/session/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabaseServer
+      .from('sessions')
+      .select('*')
+      .eq('session_id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Session fetch error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    return res.json({ session: data });
+  } catch (err) {
+    console.error('Session fetch error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

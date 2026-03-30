@@ -27,16 +27,17 @@ export interface ChatMessage {
 // Supabase row types
 export interface SessionRow {
   id: string;
-  session_hash: string;
+  session_id: string;
   created_at: string;
   risk_score: number;
   risk_tier: RiskTier;
   last_active: string;
+  messages?: Array<{role: 'user' | 'assistant' | 'system', content: string, timestamp: number}>;
 }
 
 export interface EventRow {
   id: string;
-  session_hash: string;
+  session_id: string;
   event_type: 'mood_checkin' | 'message' | 'vent' | 'exercise_complete';
   sentiment_score: number | null;
   mood_emoji: number | null;

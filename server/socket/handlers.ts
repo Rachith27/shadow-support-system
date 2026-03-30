@@ -53,11 +53,11 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
           risk_tier: riskTier,
           last_active: new Date().toISOString(),
         })
-        .eq('session_hash', payload.sessionId);
+        .eq('session_id', payload.sessionId);
 
       // Insert event
-      await supabase.from('events').insert({
-        session_hash: payload.sessionId,
+      await supabase.from('session_events').insert({
+        session_id: payload.sessionId,
         event_type: 'mood_checkin',
         sentiment_score: blendedScore,
         mood_emoji: payload.emojiIndex,
@@ -76,20 +76,38 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   // ── USER MESSAGE ───────────────────────────────────────────────
   socket.on('user_message', async (payload: UserMessagePayload) => {
     try {
-      // Log event (do NOT store text content)
-      await supabaseServer.from('events').insert({
-        session_hash: payload.sessionId,
+      const supabase = getSupabaseServer();
+      if (!supabase) return;
+
+      // 1. Log event in session_events (telemetry)
+      await supabase.from('session_events').insert({
+        session_id: payload.sessionId,
         event_type: 'message',
         sentiment_score: null,
         mood_emoji: null,
         slider_value: null,
       });
 
+      // 2. Fetch current session history from 'sessions' table
+      const { data: sessionData, error: sessionFetchError } = await supabase
+        .from('sessions')
+        .select('messages')
+        .eq('session_id', payload.sessionId)
+        .single();
+
+      if (sessionFetchError) {
+        console.error('Error fetching session history:', sessionFetchError);
+      }
+
+      const history = sessionData?.messages || [];
+      const newUserMessage = { role: 'user', content: payload.text, timestamp: Date.now() };
+      const updatedHistory = [...history, newUserMessage];
+
       // Update last_active
-      await supabaseServer
+      await supabase
         .from('sessions')
         .update({ last_active: new Date().toISOString() })
-        .eq('session_hash', payload.sessionId);
+        .eq('session_id', payload.sessionId);
 
       // Show typing indicator
       socket.emit('typing_indicator', { active: true });
@@ -101,14 +119,14 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
         }
 
         // Dynamically fetch the latest mood from DB to adjust Tone
-        const { data: moodData } = await supabaseServer
-          .from('events')
+        const { data: moodData } = await supabase
+          .from('session_events')
           .select('mood_emoji')
-          .eq('session_hash', payload.sessionId)
+          .eq('session_id', payload.sessionId)
           .eq('event_type', 'mood_checkin')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         let toneInstruction = "Be caring but neutral.";
         if (moodData && moodData.mood_emoji !== null) {
@@ -133,7 +151,14 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
 
         const systemPrompt = `You are a supportive, non-judgmental active listener on an anonymous youth mental health platform. 
         ${toneInstruction}
+        Keep the conversation flowing smoothly. Acknowledge their previous messages if relevant, but stay focused on the current topic.
         Keep responses under 3 sentences. Never offer clinical advice or diagnoses. Just validate their feelings and make them feel heard.`;
+
+        // Prepare messages for Groq (Limit history to last 10 messages + system prompt)
+        const groqMessages = [
+          { role: 'system', content: systemPrompt },
+          ...updatedHistory.slice(-10).map((m: any) => ({ role: m.role, content: m.content }))
+        ];
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -142,17 +167,8 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
             'Authorization': `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: 'llama-3.1-8b-instant', // Upgraded to current Groq model
-            messages: [
-              {
-                role: 'system',
-                content: systemPrompt
-              },
-              {
-                role: 'user',
-                content: payload.text
-              }
-            ],
+            model: 'llama-3.1-8b-instant',
+            messages: groqMessages,
             temperature: 0.7,
             max_tokens: 150,
           }),
@@ -166,15 +182,22 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
         }
 
         const reply = data.choices?.[0]?.message?.content || "I hear you, take your time.";
+        const newAssistantMessage = { role: 'assistant', content: reply.trim(), timestamp: Date.now() };
+
+        // Save conversation history back to Supabase
+        const finalHistory = [...updatedHistory, newAssistantMessage];
+        await supabase
+          .from('sessions')
+          .update({ messages: finalHistory })
+          .eq('session_id', payload.sessionId);
 
         socket.emit('typing_indicator', { active: false });
         socket.emit('system_message', { text: reply.trim() });
       } catch (aiError) {
         console.error('Groq fetch error:', aiError);
-        // Fallback if API fails or key is missing
         socket.emit('typing_indicator', { active: false });
         socket.emit('system_message', {
-          text: "I hear you. (AI is currently offline, but your notes are safe here).",
+          text: "I hear you. (AI context limit reached or API offline).",
         });
       }
 
@@ -188,16 +211,18 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   socket.on('vent_message', async (payload: VentPayload) => {
     try {
       // Log that a vent happened — no text content, no sentiment
-      await supabaseServer.from('events').insert({
-        session_hash: payload.sessionId,
+      const supabase = getSupabaseServer();
+      if (!supabase) return;
+      await supabase.from('session_events').insert({
+        session_id: payload.sessionId,
         event_type: 'vent',
       });
 
       // Update last_active
-      await supabaseServer
+      await supabase
         .from('sessions')
         .update({ last_active: new Date().toISOString() })
-        .eq('session_hash', payload.sessionId);
+        .eq('session_id', payload.sessionId);
 
       // No response event — vent mode is one-way
       console.log(`🌊 Vent from session=${payload.sessionId.slice(0, 8)}...`);

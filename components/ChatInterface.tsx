@@ -16,6 +16,7 @@ export default function ChatInterface({ sessionId, riskTier, onRiskUpdate }: Cha
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [ventMode, setVentMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -26,28 +27,52 @@ export default function ChatInterface({ sessionId, riskTier, onRiskUpdate }: Cha
 
   // Auto-scroll on new messages
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping, scrollToBottom]);
+    if (!loadingHistory) {
+      scrollToBottom();
+    }
+  }, [messages, isTyping, scrollToBottom, loadingHistory]);
 
-  // Store latest onRiskUpdate to avoid stale closures without triggering re-effects
+  // Store latest onRiskUpdate to avoid stale closures
   const onRiskUpdateRef = useRef(onRiskUpdate);
   useEffect(() => {
     onRiskUpdateRef.current = onRiskUpdate;
   }, [onRiskUpdate]);
 
-  // Socket listeners + welcome message (Run exactly ONCE on mount)
+  // Socket listeners + Initial history fetch
   useEffect(() => {
     const socket = getSocket();
 
-    // Welcome message after 1 second
-    const welcomeTimer = setTimeout(() => {
-      setMessages([{
-        id: crypto.randomUUID(),
-        role: 'system',
-        text: "Hey 👋 This is a safe, anonymous space. You can share how you're feeling, and I'll listen. Nothing here is connected to your name or identity.",
-        timestamp: Date.now(),
-      }]);
-    }, 1000);
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`http://localhost:4000/api/session/${sessionId}`);
+        const data = await res.json();
+        
+        if (data.session && data.session.messages) {
+          // Map DB messages to UI ChatMessage format
+          const history = data.session.messages.map((m: any, idx: number) => ({
+            id: `hist-${idx}`,
+            role: m.role,
+            text: m.content,
+            timestamp: m.timestamp || Date.now(),
+          }));
+          setMessages(history);
+        } else {
+          // No history — show welcome message
+          setMessages([{
+            id: crypto.randomUUID(),
+            role: 'system',
+            text: "Hey 👋 This is a safe, anonymous space. You can share how you're feeling, and I'll listen. Nothing here is connected to your name or identity.",
+            timestamp: Date.now(),
+          }]);
+        }
+      } catch (err) {
+        console.error('Failed to load history:', err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
 
     socket.on('typing_indicator', (data: { active: boolean }) => {
       setIsTyping(data.active);
@@ -67,12 +92,11 @@ export default function ChatInterface({ sessionId, riskTier, onRiskUpdate }: Cha
     });
 
     return () => {
-      clearTimeout(welcomeTimer);
       socket.off('typing_indicator');
       socket.off('system_message');
       socket.off('risk_update');
     };
-  }, []);
+  }, [sessionId]);
 
   const handleSend = () => {
     const trimmed = inputText.trim();

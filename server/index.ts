@@ -1,10 +1,15 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import './env';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { registerSocketHandlers } from './socket/handlers';
+import chatRoutes from './routes/chat';
+import behaviorRoutes from './routes/behavior';
+import volunteerRoutes from './routes/volunteer';
+import adminRoutes from './routes/admin';
+import eventRoutes from './routes/events';
+import sessionRoutes from './routes/session';
 
 const PORT = process.env.PORT || 4000;
 
@@ -29,6 +34,14 @@ io.on('connection', (socket) => {
     console.log(`❌ Client disconnected: ${socket.id}`);
   });
 });
+
+// Mounted API Routes
+app.use('/api', chatRoutes);
+app.use('/api', behaviorRoutes);
+app.use('/api/volunteer', volunteerRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/session', sessionRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

@@ -1,0 +1,126 @@
+import { Router } from 'express';
+import { supabaseAdmin } from '../../lib/supabase';
+// Note: We might want an auth middleware here later, similar to the original JS 'auth'
+
+const router = Router();
+
+function calculateRisk(report: any) {
+  let score = 0;
+  const highFlags = ['crying often', 'sudden anger', 'fearful behavior'];
+  const medFlags = ['silent', 'avoiding school'];
+
+  const changesArray = Array.isArray(report.behaviorChanges) ? report.behaviorChanges : [];
+  changesArray.forEach((f: string) => {
+    const term = typeof f === 'string' ? f.toLowerCase() : '';
+    if (highFlags.includes(term)) score += 3;
+    if (medFlags.includes(term)) score += 1;
+  });
+  
+  const mood = (report.mood || "").toLowerCase();
+  if (mood === 'sad' || mood === 'fearful' || mood === 'angry') score += 2;
+
+  if (score >= 5) return 'high';
+  if (score >= 3) return 'medium';
+  return 'low';
+}
+
+// POST /api/behavior/report
+router.post('/behavior/report', async (req, res) => {
+  try {
+    const data = req.body;
+    if (!data.ageGroup) return res.status(400).json({ error: "Missing required fields" });
+
+    const risk = calculateRisk(data);
+
+    // 1. Save Behavior Report
+    const { data: report, error: reportError } = await supabaseAdmin
+      .from('behavior_reports')
+      .insert({
+          reporter_type: data.reporterType,
+          age_group: data.ageGroup,
+          mood: data.mood,
+          behavior_changes: data.behaviorChanges,
+          social_flags: data.socialFlags,
+          academic_flags: data.academicFlags,
+          notes: data.notes
+      })
+      .select()
+      .single();
+
+    if (reportError) {
+        console.error("Supabase Report Error:", reportError);
+        return res.status(500).json({ error: 'Failed to record behavior report' });
+    }
+
+    // 2. Generate Flagged Case if risk is Medium or High
+    if (risk === 'medium' || risk === 'high') {
+      const bArray = Array.isArray(data.behaviorChanges) ? data.behaviorChanges.join(', ') : "unknown behaviors";
+      const focus = (data.behaviorChanges || []).includes('silent') ? 'School Withdrawal' : 'Emotional Distress';
+      
+      const { error: caseError } = await supabaseAdmin
+        .from('flagged_cases')
+        .insert({
+            report_id: report.id,
+            age_group: data.ageGroup,
+            risk_level: risk,
+            detected_concern: `Possible Concern: ${focus}`,
+            ai_summary: `An adult proxy observed the child feeling ${data.mood || 'distressed'} and showing ${bArray}.`,
+            guidance: {
+              approach: "Approach gently and observe first. Ensure a safe, private setting.",
+              whatToSay: ["I'm here for you.", "Would you like to sit here? No pressure to talk."],
+              dos: ["Be patient", "Listen carefully", "Offer physical comfort like water"],
+              donts: ["Push for answers", "Judge their behavior", "Invalidate feelings"]
+            }
+        });
+
+      if (caseError) {
+          console.error("Supabase Flagged Case Error:", caseError);
+      }
+
+      return res.json({ success: true, caseGenerated: true, riskLevel: risk, msg: "Case flagged for volunteer support." });
+    }
+
+    res.json({ success: true, caseGenerated: false, msg: "Observation safely recorded." });
+  } catch (err) {
+    console.error("Behavior Error:", err);
+    res.status(500).json({ error: 'Failed to record behavior properly' });
+  }
+});
+
+// GET /api/cases (Protected/Admin/Volunteer)
+router.get('/cases', async (req, res) => {
+  try {
+    const { data: cases, error } = await supabaseAdmin
+      .from('flagged_cases')
+      .select('*')
+      .neq('intervention_status', 'resolved')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Supabase Fetch Cases Error:", error);
+        return res.status(500).json({ error: 'Failed to fetch cases' });
+    }
+
+    res.json(cases);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch cases' });
+  }
+});
+
+// GET /api/cases/:id (Protected/Admin/Volunteer)
+router.get('/cases/:id', async (req, res) => {
+  try {
+    const { data: c, error } = await supabaseAdmin
+      .from('flagged_cases')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !c) return res.status(404).json({ error: 'Not found' });
+    res.json(c);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to find case' });
+  }
+});
+
+export default router;
