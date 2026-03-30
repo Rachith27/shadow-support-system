@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { supabaseAdmin } from '../../lib/supabase';
-// Note: We might want an auth middleware here later, similar to the original JS 'auth'
+import { AuthRequest, volunteerOnly } from '../middleware/auth';
 
 const router = Router();
 
@@ -24,7 +24,7 @@ function calculateRisk(report: any) {
   return 'low';
 }
 
-// POST /api/behavior/report
+// POST /api/behavior/report (Public)
 router.post('/behavior/report', async (req, res) => {
   try {
     const data = req.body;
@@ -87,8 +87,8 @@ router.post('/behavior/report', async (req, res) => {
   }
 });
 
-// GET /api/cases (Protected/Admin/Volunteer)
-router.get('/cases', async (req, res) => {
+// GET /api/cases (Protected/Volunteer)
+router.get('/cases', volunteerOnly, async (req: AuthRequest, res: Response) => {
   try {
     const { data: cases, error } = await supabaseAdmin
       .from('flagged_cases')
@@ -107,8 +107,8 @@ router.get('/cases', async (req, res) => {
   }
 });
 
-// GET /api/cases/:id (Protected/Admin/Volunteer)
-router.get('/cases/:id', async (req, res) => {
+// GET /api/cases/:id (Protected/Volunteer)
+router.get('/cases/:id', volunteerOnly, async (req: AuthRequest, res: Response) => {
   try {
     const { data: c, error } = await supabaseAdmin
       .from('flagged_cases')
@@ -120,6 +120,32 @@ router.get('/cases/:id', async (req, res) => {
     res.json(c);
   } catch (err) {
     res.status(500).json({ error: 'Failed to find case' });
+  }
+});
+
+// PATCH /api/cases/:id/status (Protected/Volunteer)
+router.patch('/cases/:id/status', volunteerOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.body;
+    if (!['pending', 'in_progress', 'resolved'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('flagged_cases')
+      .update({ intervention_status: status })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error || !updated) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Status Update Error:", err);
+    res.status(500).json({ error: 'Failed to update case status' });
   }
 });
 

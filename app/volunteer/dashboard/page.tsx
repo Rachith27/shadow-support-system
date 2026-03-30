@@ -94,9 +94,9 @@ export default function VolunteerDashboard() {
                   </p>
                 </div>
               </div>
-              <button className="mt-5 w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white py-3 font-semibold transition">
+              <Link href="/volunteer/cases" className="mt-5 w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white py-3 font-semibold transition flex items-center justify-center">
                 View Cases
-              </button>
+              </Link>
             </div>
 
             <div className="bg-white rounded-3xl shadow-sm border border-emerald-100 p-6">
@@ -111,9 +111,9 @@ export default function VolunteerDashboard() {
                   </p>
                 </div>
               </div>
-              <button className="mt-5 w-full rounded-2xl bg-violet-600 hover:bg-violet-700 text-white py-3 font-semibold transition">
+              <Link href="/volunteer/cases" className="mt-5 w-full rounded-2xl bg-violet-600 hover:bg-violet-700 text-white py-3 font-semibold transition flex items-center justify-center">
                 Open Guidance
-              </button>
+              </Link>
             </div>
 
             <div className="bg-white rounded-3xl shadow-sm border border-emerald-100 p-6 md:col-span-2">
