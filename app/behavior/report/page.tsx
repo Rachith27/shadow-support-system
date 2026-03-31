@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { API_BASE } from '@/lib/api';
 
 export default function BehaviorReport() {
   const [data, setData] = useState<{
@@ -32,7 +33,7 @@ export default function BehaviorReport() {
   const [submitted, setSubmitted] = useState(false);
   const router = useRouter();
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const toggle = (field: 'behaviorChanges' | 'socialFlags', val: string) => {
     setData(prev => ({

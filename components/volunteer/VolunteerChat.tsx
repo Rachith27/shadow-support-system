@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getSocket } from '@/lib/socket';
 import { Send, User, MessageSquare, ShieldCheck } from 'lucide-react';
 import type { ChatMessage } from '@/types';
+import { API_BASE } from '@/lib/api';
 
 interface VolunteerChatProps {
   sessionId: string;
@@ -66,7 +67,7 @@ export default function VolunteerChat({ sessionId, volunteerName }: VolunteerCha
     // Fetch initial history from DB via API (optional, but good for context)
     const fetchHistory = async () => {
         try {
-            const res = await fetch(`http://localhost:4000/api/session/${sessionId}`);
+            const res = await fetch(`${API_BASE}/session/${sessionId}`);
             if (res.ok) {
                 const data = await res.json();
                 const formatted = (data.messages || []).map((m: any, i: number) => ({

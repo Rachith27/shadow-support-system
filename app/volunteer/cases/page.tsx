@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, ClipboardList, Filter } from 'lucide-react';
 import CaseCard from '@/components/CaseCard';
+import { API_BASE } from '@/lib/api';
 
 export default function VolunteerCases() {
   const [cases, setCases] = useState<any[]>([]);
@@ -12,7 +13,7 @@ export default function VolunteerCases() {
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
   const router = useRouter();
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const fetchCases = async () => {
     setLoading(true);

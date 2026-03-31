@@ -8,6 +8,7 @@ import PreChatForm from './PreChatForm';
 import { LogOut, CheckCircle, RefreshCcw, Sparkles } from 'lucide-react';
 import type { ChatMessage, RiskTier, RiskUpdatePayload, UserMessagePayload } from '@/types';
 import CopingToolkit from './exercises/CopingToolkit';
+import { API_BASE } from '@/lib/api';
 
 interface ChatInterfaceProps {
   initialSessionId?: string | null;
@@ -32,7 +33,7 @@ export default function ChatInterface({ initialSessionId, onRiskUpdate, onMoodCh
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MessageSquare, LogOut, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { API_BASE } from '@/lib/api';
 
 interface Session {
   id: string;
@@ -30,7 +31,7 @@ export default function SafeChatHub() {
 
     if (name) setUserName(name);
 
-    fetch(`http://localhost:4000/api/session/user/${userId}`, {
+    fetch(`${API_BASE}/session/user/${userId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -57,7 +58,7 @@ export default function SafeChatHub() {
     const age = localStorage.getItem("user_age");
 
     try {
-      const res = await fetch("http://localhost:4000/api/session/create", {
+      const res = await fetch(`${API_BASE}/session/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

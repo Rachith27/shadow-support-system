@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, UserPlus } from 'lucide-react';
+import { API_BASE } from '@/lib/api';
 
 export default function VolunteerRegister() {
   const [formData, setFormData] = useState({ 
@@ -18,7 +19,7 @@ export default function VolunteerRegister() {
   const [submitted, setSubmitted] = useState(false);
   const router = useRouter();
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

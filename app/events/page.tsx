@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Sparkles } from 'lucide-react';
 import EventCard from '@/components/EventCard';
+import { API_BASE } from '@/lib/api';
 
 function EventsContent() {
   const [events, setEvents] = useState<any[]>([]);
@@ -12,7 +13,7 @@ function EventsContent() {
   const searchParams = useSearchParams();
   const issue = searchParams.get('issue');
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   useEffect(() => {
     let url = `${API_BASE}/events`;

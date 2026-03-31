@@ -14,9 +14,10 @@ import authRoutes from './routes/auth';
 import { supabaseAdmin } from '../lib/supabase';
 
 const PORT = process.env.PORT || 4000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());
 
 // Fetch session history for volunteer context
@@ -40,7 +41,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST'],
   },
 });

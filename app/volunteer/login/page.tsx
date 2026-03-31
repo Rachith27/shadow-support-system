@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogIn, Mail, Lock, ArrowLeft } from "lucide-react";
+import { API_BASE } from '@/lib/api';
 
 export default function VolunteerLogin() {
     const router = useRouter();
@@ -14,7 +15,7 @@ export default function VolunteerLogin() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const API_BASE = 'http://localhost:4000/api';
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm((prev) => ({

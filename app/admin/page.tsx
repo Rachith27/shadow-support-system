@@ -10,6 +10,7 @@ import {
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
+import { API_BASE } from '@/lib/api';
 
 interface Volunteer {
   id: string;
@@ -56,7 +57,7 @@ export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const nav = useRouter();
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const fetchData = () => {
     const token = localStorage.getItem('adminToken');

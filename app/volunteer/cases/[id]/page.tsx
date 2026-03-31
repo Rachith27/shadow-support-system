@@ -14,6 +14,7 @@ import {
   Zap
 } from 'lucide-react';
 import VolunteerChat from '@/components/volunteer/VolunteerChat';
+import { API_BASE } from '@/lib/api';
 
 export default function InterventionGuide() {
   const { id } = useParams();
@@ -22,7 +23,7 @@ export default function InterventionGuide() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
-  const API_BASE = 'http://localhost:4000/api';
+
 
   const fetchCaseDetail = async () => {
     const token = localStorage.getItem('volunteerToken');
