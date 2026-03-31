@@ -29,6 +29,7 @@ interface InsightSession {
   topic_category: string;
   ai_summary: string;
   created_at: string;
+  chat_type?: string;
 }
 
 interface DashboardData {
@@ -328,6 +329,9 @@ export default function AdminDashboard() {
                              </div>
                              <div className="bg-white px-4 py-2 rounded-xl text-[10px] font-black text-gray-400 border border-gray-100 uppercase tracking-widest">
                                 Age {s.age_group_segment}
+                             </div>
+                             <div className={`bg-white px-4 py-2 rounded-xl text-[10px] font-black border uppercase tracking-widest ${s.chat_type === 'safe' ? 'text-indigo-600 border-indigo-100' : 'text-slate-400 border-slate-100'}`}>
+                                {s.chat_type === 'safe' ? 'Safe Chat' : 'Anonymous'}
                              </div>
                           </div>
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">

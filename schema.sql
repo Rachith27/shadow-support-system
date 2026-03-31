@@ -1,6 +1,16 @@
 -- schema.sql: Tables Migration from MongoDB to Supabase
 
--- 1. Volunteers Table
+-- 1. Users Table (Safe Chat)
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    full_name TEXT,
+    age_group TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Volunteers Table
 CREATE TABLE IF NOT EXISTS volunteers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name TEXT NOT NULL,
@@ -61,10 +71,13 @@ CREATE TABLE IF NOT EXISTS flagged_cases (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. Chat Sessions Table
+-- 6. Chat Sessions Table
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id TEXT UNIQUE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    chat_type TEXT DEFAULT 'anonymous',
+    title TEXT,
     age_group TEXT,
     messages JSONB DEFAULT '[]'::JSONB, -- Stores array of { role, content, timestamp }
     analysis JSONB, -- Stores { emotion, situation, trigger, supportNeed, riskLevel }

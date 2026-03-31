@@ -10,6 +10,7 @@ import volunteerRoutes from './routes/volunteer';
 import adminRoutes from './routes/admin';
 import eventRoutes from './routes/events';
 import sessionRoutes from './routes/session';
+import authRoutes from './routes/auth';
 import { supabaseAdmin } from '../lib/supabase';
 
 const PORT = process.env.PORT || 4000;
@@ -56,6 +57,7 @@ io.on('connection', (socket) => {
 // Mounted API Routes
 app.use('/api', chatRoutes);
 app.use('/api', behaviorRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/volunteer', volunteerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventRoutes);

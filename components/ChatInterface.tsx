@@ -10,16 +10,19 @@ import type { ChatMessage, RiskTier, RiskUpdatePayload, UserMessagePayload } fro
 import CopingToolkit from './exercises/CopingToolkit';
 
 interface ChatInterfaceProps {
+  initialSessionId?: string | null;
   onRiskUpdate: (update: RiskUpdatePayload) => void;
+  onMoodCheckInComplete?: () => void;
 }
 
-export default function ChatInterface({ onRiskUpdate }: ChatInterfaceProps) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+export default function ChatInterface({ initialSessionId, onRiskUpdate, onMoodCheckInComplete }: ChatInterfaceProps) {
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
+  const [chatType, setChatType] = useState<'anonymous' | 'safe'>('anonymous');
   const [riskTier, setRiskTier] = useState<RiskTier>('low');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [showIntake, setShowIntake] = useState(true);
+  const [showIntake, setShowIntake] = useState(!initialSessionId);
   const [isEnded, setIsEnded] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [ventMode, setVentMode] = useState(false);
@@ -34,6 +37,22 @@ export default function ChatInterface({ onRiskUpdate }: ChatInterfaceProps) {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  useEffect(() => {
+    if (initialSessionId) {
+      fetch(`${API_BASE}/session/${initialSessionId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.session) {
+                setChatType(data.session.chat_type || 'anonymous');
+                if (data.session.messages) {
+                     setMessages(data.session.messages);
+                }
+            }
+        })
+        .catch(console.error);
+    }
+  }, [initialSessionId]);
 
   useEffect(() => {
     if (sessionId) {
@@ -234,6 +253,17 @@ export default function ChatInterface({ onRiskUpdate }: ChatInterfaceProps) {
         </div>
 
         <div className="flex items-center gap-4">
+          {chatType === 'safe' && (riskTier === 'medium' || riskTier === 'high') && (
+            <button
+               onClick={() => {
+                 getSocket().emit('request_volunteer', { sessionId });
+               }}
+               className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95"
+            >
+               Talk to Volunteer
+            </button>
+          )}
+
           <button
             onClick={() => setToolkitOpen(true)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border-2

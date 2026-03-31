@@ -33,14 +33,13 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="pt-4">
+        <div className="pt-4 flex flex-col md:flex-row items-center justify-center gap-4">
           <button
             id="start-anonymously"
             onClick={() => router.push('/chat')}
             type="button"
-            className="group relative inline-flex items-center justify-center px-10 py-5 font-bold text-white transition-all duration-300 bg-brand-navy rounded-2xl hover:bg-slate-800 shadow-xl shadow-brand-navy/20 hover:shadow-2xl hover:shadow-brand-navy/30 hover:-translate-y-1 active:scale-95 overflow-hidden"
+            className="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-300 bg-brand-navy rounded-2xl hover:bg-slate-800 shadow-xl shadow-brand-navy/20 hover:shadow-2xl hover:shadow-brand-navy/30 hover:-translate-y-1 active:scale-95 overflow-hidden w-full md:w-auto"
           >
-            {/* Shimmer effect */}
             <span className="absolute inset-0 w-full h-full shimmer-bg opacity-20 group-hover:opacity-40 transition-opacity" />
             <span className="relative flex items-center gap-2">
               Start Anonymously
@@ -49,10 +48,30 @@ export default function LandingPage() {
               </svg>
             </span>
           </button>
-          <div className="mt-6 flex items-center justify-center gap-6 text-sm font-medium text-text-muted">
-            <span className="flex items-center gap-2">🛡️ End-to-End Private</span>
-            <span className="flex items-center gap-2">🔒 No PII Stored</span>
+          
+          <button
+            onClick={() => router.push('/login')}
+            type="button"
+            className="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-brand-navy transition-all duration-300 bg-white border-2 border-slate-100 rounded-2xl hover:border-brand-teal hover:text-brand-teal shadow-premium hover:-translate-y-1 active:scale-95 overflow-hidden w-full md:w-auto"
+          >
+            <span className="relative flex items-center gap-2">
+              Safe Chat (Login)
+              <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+            </span>
+          </button>
+        </div>
+        
+        <div className="mt-6 flex flex-col items-center gap-2 text-sm font-medium text-text-muted">
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-1.5">🛡️ Private</span>
+            <span className="flex items-center gap-1.5">🔒 Secure</span>
           </div>
+          <p className="text-xs text-text-muted/60 max-w-sm text-center">
+            <strong>Anonymous:</strong> Talk freely without revealing your identity.<br/>
+            <strong>Safe Chat:</strong> Login to access continued support and connect with volunteers.
+          </p>
         </div>
       </div>
 

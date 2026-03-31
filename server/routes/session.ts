@@ -12,20 +12,25 @@ const supabaseServer = createClient(
 // POST /api/session/create
 router.post('/create', async (req, res) => {
   try {
-    const { sessionId, userName, ageGroup, phone } = req.body;
+    const { sessionId, userName, ageGroup, phone, userId, chatType } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({ error: 'sessionId is required' });
     }
 
+    const title = chatType === 'safe' ? `Session ${new Date().toLocaleDateString()}` : undefined;
+
     const { data, error } = await supabaseServer
       .from('sessions')
       .insert({ 
         session_id: sessionId,
-        user_name: userName, // Stored but hidden from dashboard
-        age_group: ageGroup, // For display
-        age_group_segment: ageGroup, // For aggregation
-        phone: phone || null
+        user_name: userName || null, 
+        age_group: ageGroup || null, 
+        age_group_segment: ageGroup || null, 
+        phone: phone || null,
+        user_id: userId || null,
+        chat_type: chatType || 'anonymous',
+        title: title
       })
       .select()
       .single();
@@ -38,6 +43,24 @@ router.post('/create', async (req, res) => {
     return res.status(201).json({ session: data });
   } catch (err) {
     console.error('Session endpoint error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/session/user/:userId
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { data, error } = await supabaseServer
+      .from('sessions')
+      .select('id, session_id, chat_type, title, created_at')
+      .eq('user_id', userId)
+      .eq('chat_type', 'safe')
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ sessions: data });
+  } catch (err) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

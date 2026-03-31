@@ -75,7 +75,7 @@ router.get('/dashboard', adminOnly, async (req: AuthRequest, res: Response) => {
     // Detailed Session Insights
     const { data: recentSessions } = await supabaseAdmin
       .from('sessions')
-      .select('id, session_id, age_group_segment, topic_category, ai_summary, created_at')
+      .select('id, session_id, age_group_segment, topic_category, ai_summary, created_at, chat_type')
       .eq('is_completed', true)
       .order('created_at', { ascending: false })
       .limit(10);

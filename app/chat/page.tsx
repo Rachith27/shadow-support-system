@@ -1,45 +1,44 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession } from '@/lib/session';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import MoodCheckIn from '@/components/MoodCheckIn';
 import ChatInterface from '@/components/ChatInterface';
 import type { RiskTier, RiskUpdatePayload } from '@/types';
 
-export default function ChatPage() {
-  const { session, setSession } = useSession();
+function ChatContent() {
+  const searchParams = useSearchParams();
+  const urlSessionId = searchParams.get('sessionId');
+  
   const [riskTier, setRiskTier] = useState<RiskTier>('low');
   const [showMoodCheckIn, setShowMoodCheckIn] = useState(true);
 
   const handleRiskUpdate = (update: RiskUpdatePayload) => {
     setRiskTier(update.riskTier);
-    setSession(prev =>
-      prev ? { ...prev, riskScore: update.riskScore, riskTier: update.riskTier } : prev
-    );
   };
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-brand-bg">
-        <div className="w-10 h-10 border-3 border-brand-teal/20 border-t-brand-teal rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Creating your safe space...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-brand-bg">
-      {showMoodCheckIn && (
+      {/* We only show Mood Check In for new sessions? Let's just show it always or pass something. Let's pass the URL session ID to ChatInterface. ChatInterface will handle whether to show MoodCheckIn maybe. Actually, MoodCheckIn needs sessionId. So we render it if we have one. But let's just let ChatInterface handle session ID. */}
+      {showMoodCheckIn && urlSessionId && (
         <MoodCheckIn
-          sessionId={session.sessionId}
+          sessionId={urlSessionId}
           onComplete={() => setShowMoodCheckIn(false)}
         />
       )}
       <ChatInterface
-        sessionId={session.sessionId}
-        riskTier={riskTier}
+        initialSessionId={urlSessionId}
         onRiskUpdate={handleRiskUpdate}
+        onMoodCheckInComplete={() => setShowMoodCheckIn(false)}
       />
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ChatContent />
+    </Suspense>
   );
 }

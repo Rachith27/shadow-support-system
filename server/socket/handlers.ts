@@ -238,6 +238,36 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
     } catch (err) { console.error('Reframe error:', err); }
   });
 
+  // ── REQUEST VOLUNTEER (Safe Chat) ─────────────────────────────
+  socket.on('request_volunteer', async (payload: { sessionId: string }) => {
+    socket.join(payload.sessionId);
+    try {
+      const supabase = getSupabaseServer();
+      if (!supabase) return;
+
+      const { data: sessionInfo } = await supabase.from('sessions').select('age_group, user_name, chat_type, risk_tier').eq('session_id', payload.sessionId).single();
+
+      // Check if any volunteer is available (simulated for MVP)
+      // If none, we could emit 'volunteer_unavailable'
+      // But for now, we create a flagged case to alert volunteers on the admin/volunteer dashboard.
+      await supabase.from('flagged_cases').insert({
+          session_id: payload.sessionId,
+          age_group: sessionInfo?.age_group || 'Unknown',
+          risk_level: sessionInfo?.risk_tier || 'medium',
+          detected_concern: `User Requested Volunteer: ${sessionInfo?.user_name || 'Safe Chat User'}`,
+          ai_summary: `User explicitly requested to speak to a volunteer.`,
+          guidance: { 
+            approach: "Join via Safe Chat. User requested help.", 
+            whatToSay: ["Hi, I'm here to support you. How can I help?"], 
+            dos: ["Listen to what they need"], 
+            donts: [] 
+          }
+      });
+
+      socket.emit('system_message', { text: "I've alerted our counseling team. The next available counselor will join this chat shortly to support you." });
+    } catch (err) { console.error('Request volunteer error:', err); }
+  });
+
   // ── VENT MESSAGE ───────────────────────────────────────────────
   socket.on('vent_message', async (payload: VentPayload) => {
     socket.join(payload.sessionId);
