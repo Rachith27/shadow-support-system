@@ -18,43 +18,31 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const app = express();
 
-// Robust CORS Configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://shadow-support-system.vercel.app',
-  process.env.FRONTEND_URL
-].filter(Boolean) as string[];
-
+// Lenient CORS for debugging
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in our allowed list or is a Vercel URL
-    const isAllowed = allowedOrigins.some(ao => origin === ao || origin === ao.replace(/\/$/, '')) || 
-                      origin.endsWith('.vercel.app');
-                      
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.log('🚫 CORS blocked for origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, 
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Root route for simple confirmation
+app.get('/', (req, res) => {
+  res.json({ 
+    message: "🚀 SSS Backend is ACTIVE!", 
+    time: new Date().toISOString(),
+    cors: "Lenient Mode ON"
+  });
+});
+
 // CORS diagnostic route
 app.get('/api/debug/cors', (req, res) => {
   res.json({
     origin: req.headers.origin || 'No origin',
-    allowedOrigins,
-    envFrontendUrl: process.env.FRONTEND_URL
+    frontendUrl: process.env.FRONTEND_URL || 'Not Set'
   });
 });
 
@@ -98,15 +86,6 @@ app.use('/api/volunteer', volunteerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/session', sessionRoutes);
-
-// Root route for simple confirmation
-app.get('/', (req, res) => {
-  res.json({ 
-    message: "🚀 SSS Backend is alive and well!", 
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Health check
 app.get('/api/health', (req, res) => {
