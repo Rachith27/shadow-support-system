@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "server": "tsx --watch --env-file=.env.local server/index.ts",
+    "server:prod": "tsx server/index.ts",
     "dev:all": "npm run server & npm run dev"
   },
   "dependencies": {
