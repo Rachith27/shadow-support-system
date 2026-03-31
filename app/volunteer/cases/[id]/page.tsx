@@ -43,6 +43,8 @@ export default function InterventionGuide() {
     }
   };
 
+  const isLiveRequest = caseData?.detected_concern?.toLowerCase().includes('user requested volunteer');
+
   const updateStatus = async (status: string) => {
     setUpdating(true);
     const token = localStorage.getItem('volunteerToken');
@@ -93,11 +95,16 @@ export default function InterventionGuide() {
         <div className="max-w-4xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => router.push('/volunteer/cases')} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-500"><ArrowLeft size={20}/></button>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Intervention Guide</h1>
+            <div className="flex flex-col">
+               <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-none">Intervention Guide</h1>
+               {isLiveRequest && (
+                 <span className="text-[10px] font-black uppercase text-indigo-600 mt-1 tracking-widest animate-pulse">Live Support Request</span>
+               )}
+            </div>
           </div>
           <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
-            ${caseData.risk_level === 'high' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-            {caseData.risk_level} Risk Level
+            ${isLiveRequest ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200' : caseData.risk_level === 'high' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+            {isLiveRequest ? 'Immediate Attention' : `${caseData.risk_level} Risk Level`}
           </div>
         </div>
       </header>
@@ -230,10 +237,22 @@ export default function InterventionGuide() {
            
            {/* Section: Live Chat Hand-off */}
            {caseData.session_id && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner"><Zap size={18}/></div>
-                    <h2 className="text-xl font-black text-gray-800 tracking-tight">Live Human Intervention</h2>
+              <div 
+                id="live-chat-section"
+                className={`animate-in fade-in slide-in-from-bottom-4 duration-700 ${isLiveRequest ? 'ring-4 ring-indigo-500/20 rounded-[2.5rem]' : ''}`}
+              >
+                 <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-inner ${isLiveRequest ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                          <Zap size={18}/>
+                       </div>
+                       <h2 className="text-xl font-black text-gray-800 tracking-tight">
+                          {isLiveRequest ? 'Initial Life Support Chat' : 'Live Human Intervention'}
+                       </h2>
+                    </div>
+                    {isLiveRequest && (
+                      <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Priority Room</span>
+                    )}
                  </div>
                  <VolunteerChat 
                     sessionId={caseData.session_id} 

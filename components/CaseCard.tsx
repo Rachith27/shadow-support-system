@@ -16,26 +16,37 @@ interface CaseCardProps {
 
 export default function CaseCard({ caseData, showLink = true }: CaseCardProps) {
   const isHigh = caseData.risk_level === 'high';
+  const isLiveRequest = caseData.detected_concern?.toLowerCase().includes('user requested volunteer');
 
   return (
     <div
-      className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 shadow-sm border flex flex-col transition hover:shadow-lg hover:-translate-y-1 ${isHigh
-          ? 'border-l-4 border-l-rose-500 border-rose-100'
-          : 'border-l-4 border-l-amber-500 border-gray-100'
+      className={`bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 shadow-sm border flex flex-col transition hover:shadow-lg hover:-translate-y-1 
+        ${isLiveRequest 
+          ? 'border-l-4 border-l-indigo-600 border-indigo-100 bg-indigo-50/30' 
+          : isHigh
+            ? 'border-l-4 border-l-rose-500 border-rose-100'
+            : 'border-l-4 border-l-amber-500 border-gray-100'
         }`}
     >
       {/* Top Info */}
       <div className="flex justify-between items-start mb-2 gap-2">
-        <span className="text-[10px] sm:text-xs font-bold uppercase bg-gray-50 text-gray-600 px-2 py-1 rounded">
-          Age {caseData.age_group || 'Unknown'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] sm:text-xs font-bold uppercase bg-gray-50 text-gray-600 px-2 py-1 rounded">
+            Age {caseData.age_group || 'Unknown'}
+          </span>
+          {isLiveRequest && (
+            <span className="text-[9px] sm:text-[10px] font-black uppercase bg-indigo-600 text-white px-2 py-1 rounded animate-pulse tracking-widest leading-none">
+              Live Request
+            </span>
+          )}
+        </div>
 
         <span
-          className={`text-[10px] sm:text-xs font-bold uppercase flex items-center ${isHigh ? 'text-rose-500' : 'text-amber-500'
-            }`}
+          className={`text-[10px] sm:text-xs font-bold uppercase flex items-center 
+            ${isLiveRequest ? 'text-indigo-600' : isHigh ? 'text-rose-500' : 'text-amber-500'}`}
         >
-          {isHigh && <AlertTriangle size={14} className="mr-1" />}
-          {caseData.risk_level} Risk
+          {isHigh && !isLiveRequest && <AlertTriangle size={14} className="mr-1" />}
+          {isLiveRequest ? 'Immediate' : caseData.risk_level} Risk
         </span>
       </div>
 

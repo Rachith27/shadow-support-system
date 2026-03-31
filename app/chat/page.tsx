@@ -9,6 +9,7 @@ import type { RiskTier, RiskUpdatePayload } from '@/types';
 function ChatContent() {
   const searchParams = useSearchParams();
   const urlSessionId = searchParams.get('sessionId');
+  const directVolunteer = searchParams.get('directVolunteer') === 'true';
   
   const [riskTier, setRiskTier] = useState<RiskTier>('low');
   const [showMoodCheckIn, setShowMoodCheckIn] = useState(true);
@@ -28,6 +29,7 @@ function ChatContent() {
       )}
       <ChatInterface
         initialSessionId={urlSessionId}
+        initialRequestVolunteer={directVolunteer}
         onRiskUpdate={handleRiskUpdate}
         onMoodCheckInComplete={() => setShowMoodCheckIn(false)}
       />

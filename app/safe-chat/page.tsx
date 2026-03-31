@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, MessageSquare, LogOut, Loader2, ArrowRight } from "lucide-react";
+import { Plus, MessageSquare, LogOut, Loader2, ArrowRight, Headset, Zap } from "lucide-react";
 import Link from "next/link";
 import { API_BASE } from '@/lib/api';
 
@@ -103,18 +103,87 @@ export default function SafeChatHub() {
           </div>
         </div>
 
-        <button 
-          onClick={handleLogout}
-          className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition shadow-sm border border-rose-100"
-          title="Sign Out"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => {
+              const newSessionId = crypto.randomUUID();
+              const userId = localStorage.getItem("user_id");
+              const name = localStorage.getItem("user_name");
+              const age = localStorage.getItem("user_age");
+              fetch(`${API_BASE}/session/create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId: newSessionId,
+                  userId,
+                  userName: name,
+                  ageGroup: age,
+                  chatType: "safe"
+                })
+              }).then(res => {
+                if (res.ok) {
+                  router.push(`/chat?sessionId=${newSessionId}&directVolunteer=true`);
+                }
+              });
+            }}
+            className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition shadow-lg shadow-amber-500/20"
+          >
+            <Headset size={14} />
+            Connect with Volunteer
+          </button>
+          
+          <button 
+            onClick={handleLogout}
+            className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition shadow-sm border border-rose-100"
+            title="Sign Out"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-10 relative z-10 animate-in">
         
+        {/* Direct Volunteer Support Card - PLACED AT TOP FOR VISIBILITY */}
+        <div className="mb-12 bg-gradient-to-br from-indigo-600 via-indigo-700 to-amber-600 rounded-[3rem] p-8 md:p-12 shadow-[0_32px_64px_-16px_rgba(79,70,229,0.3)] text-white relative overflow-hidden group border border-white/10">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+            <div className="w-24 h-24 bg-white/15 backdrop-blur-xl rounded-[2rem] flex items-center justify-center text-5xl shadow-2xl ring-1 ring-white/20">
+              🤝
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h3 className="text-3xl font-black mb-3 tracking-tight">Need someone to talk to?</h3>
+              <p className="text-indigo-50 font-medium leading-relaxed opacity-90 max-w-md text-lg">
+                Our counselors are available 24/7. Connect directly for immediate human support.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                const newSessionId = crypto.randomUUID();
+                const userId = localStorage.getItem("user_id");
+                const name = localStorage.getItem("user_name");
+                const age = localStorage.getItem("user_age");
+                try {
+                  const res = await fetch(`${API_BASE}/session/create`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ sessionId: newSessionId, userId, userName: name, ageGroup: age, chatType: "safe" })
+                  });
+                  if (res.ok) {
+                    router.push(`/chat?sessionId=${newSessionId}&directVolunteer=true`);
+                  }
+                } catch (err) { console.error(err); }
+              }}
+              className="bg-white text-indigo-700 px-10 py-5 rounded-[1.5rem] font-black shadow-2xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap text-lg ring-4 ring-white/10"
+            >
+              Start Live Chat
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
             <h2 className="text-3xl font-black text-brand-navy tracking-tight">Your Support History</h2>

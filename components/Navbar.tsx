@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   ShieldCheck,
-  LogOut
+  LogOut,
+  LifeBuoy
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -115,6 +116,17 @@ export default function Navbar() {
               <LogOut size={18} />
               Logout
             </button>
+          )}
+
+          {/* New Global Emergency/Volunteer Button */}
+          {!isAdmin && !isVolunteer && (
+             <Link 
+               href="/chat?directVolunteer=true"
+               className="ml-4 px-5 py-2.5 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-rose-200 hover:scale-105 transition-all flex items-center gap-2 animate-pulse"
+             >
+               <LifeBuoy size={16} />
+               Need Help?
+             </Link>
           )}
         </div>
 

@@ -143,6 +143,27 @@ export default function MoodCheckIn({ sessionId, onComplete }: MoodCheckInProps)
           Anonymous & Encrypted
           <span className="w-1 h-1 rounded-full bg-brand-teal/40" />
         </p>
+
+        {/* Immediate Help Shortcut */}
+        <div className="mt-8 pt-8 border-t border-slate-50 flex flex-col items-center gap-3">
+          <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest">In immediate distress?</p>
+          <button 
+            onClick={() => {
+               getSocket().emit('request_volunteer', { sessionId });
+               // Complete the check-in immediately to show the chat
+               onComplete({
+                  emojiIndex: 4, // Default to struggling for risk-flagging
+                  sliderValue: 0,
+                  timestamp: Date.now(),
+                  sentimentScore: 0
+               });
+            }}
+            className="flex items-center gap-2 text-xs font-black text-rose-500 uppercase tracking-widest hover:text-rose-600 transition-colors group cursor-pointer"
+          >
+            Connect with Counselor Directly
+            <span className="group-hover:translate-x-1 transition-transform">→</span>
+          </button>
+        </div>
       </div>
     </div>
   );

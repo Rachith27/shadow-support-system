@@ -74,6 +74,13 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
               donts: ["Call immediately"] 
             }
          });
+          
+          // Emit global alert to all connected sockets (volunteers)
+          io.emit('new_intervention_needed', {
+              sessionId: payload.sessionId,
+              riskLevel: 'high',
+              studentName: sessionInfo?.user_name || 'Anonymous'
+          });
       }
       socket.emit('risk_update', { riskTier, riskScore });
     } catch (err) { console.error('Mood checkin error:', err); }
@@ -263,7 +270,14 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
             donts: [] 
           }
       });
-
+      
+      // Emit global alert to all connected sockets (volunteers)
+      io.emit('new_intervention_needed', {
+          sessionId: payload.sessionId,
+          riskLevel: 'immediate',
+          studentName: sessionInfo?.user_name || 'Safe Chat User'
+      });
+      
       socket.emit('system_message', { text: "I've alerted our counseling team. The next available counselor will join this chat shortly to support you." });
     } catch (err) { console.error('Request volunteer error:', err); }
   });

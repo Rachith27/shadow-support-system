@@ -5,20 +5,28 @@ import { getSocket } from '@/lib/socket';
 import RiskBadge from './RiskBadge';
 import VentMode from './VentMode';
 import PreChatForm from './PreChatForm';
-import { LogOut, CheckCircle, RefreshCcw, Sparkles } from 'lucide-react';
+import { LogOut, CheckCircle, RefreshCcw, Sparkles, LifeBuoy } from 'lucide-react';
 import type { ChatMessage, RiskTier, RiskUpdatePayload, UserMessagePayload } from '@/types';
 import CopingToolkit from './exercises/CopingToolkit';
 import { API_BASE } from '@/lib/api';
 
 interface ChatInterfaceProps {
   initialSessionId?: string | null;
+  initialChatType?: 'anonymous' | 'safe';
+  initialRequestVolunteer?: boolean;
   onRiskUpdate: (update: RiskUpdatePayload) => void;
   onMoodCheckInComplete?: () => void;
 }
 
-export default function ChatInterface({ initialSessionId, onRiskUpdate, onMoodCheckInComplete }: ChatInterfaceProps) {
+export default function ChatInterface({ 
+  initialSessionId, 
+  initialChatType = 'anonymous',
+  initialRequestVolunteer,
+  onRiskUpdate, 
+  onMoodCheckInComplete 
+}: ChatInterfaceProps) {
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
-  const [chatType, setChatType] = useState<'anonymous' | 'safe'>('anonymous');
+  const [chatType, setChatType] = useState<'anonymous' | 'safe'>(initialChatType);
   const [riskTier, setRiskTier] = useState<RiskTier>('low');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -126,6 +134,11 @@ export default function ChatInterface({ initialSessionId, onRiskUpdate, onMoodCh
         volunteerName: data.volunteerName
       }]);
     });
+
+    // Auto-request volunteer if flag is set
+    if (initialRequestVolunteer && sessionId) {
+       getSocket().emit('request_volunteer', { sessionId });
+    }
 
     return () => {
       socket.off('typing_indicator');
@@ -254,16 +267,26 @@ export default function ChatInterface({ initialSessionId, onRiskUpdate, onMoodCh
         </div>
 
         <div className="flex items-center gap-4">
-          {chatType === 'safe' && (riskTier === 'medium' || riskTier === 'high') && (
-            <button
-               onClick={() => {
-                 getSocket().emit('request_volunteer', { sessionId });
-               }}
-               className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95"
-            >
-               Talk to Volunteer
-            </button>
-          )}
+          <button
+             onClick={() => {
+               if (sessionId) {
+                  getSocket().emit('request_volunteer', { sessionId });
+               } else {
+                  // If no session started yet, we can't request, but we show the volunteer's presence
+                  alert("Please start your chat session first so we can connect you with the right person.");
+               }
+             }}
+             title="Request immediate human support"
+             className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 
+               ${(riskTier === 'medium' || riskTier === 'high') 
+                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 animate-pulse' 
+                 : 'bg-white text-brand-navy border-2 border-slate-100 hover:border-amber-500 hover:text-amber-500 shadow-premium'
+               } hover:scale-105 active:scale-95`}
+          >
+             <LifeBuoy size={16} />
+             <span className="hidden sm:inline">Talk to Volunteer</span>
+             <span className="sm:hidden">Counselor</span>
+          </button>
 
           <button
             onClick={() => setToolkitOpen(true)}

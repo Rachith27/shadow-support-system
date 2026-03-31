@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RefreshCw, ClipboardList, Filter } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ClipboardList, Filter, RefreshCcw } from 'lucide-react';
 import CaseCard from '@/components/CaseCard';
 import { API_BASE } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 
 export default function VolunteerCases() {
   const [cases, setCases] = useState<any[]>([]);
@@ -29,7 +30,17 @@ export default function VolunteerCases() {
       });
       if (!res.ok) throw new Error('Failed to fetch cases');
       const data = await res.json();
-      setCases(data);
+      
+      // Prioritize "User Requested Volunteer" cases at the top
+      const sorted = [...data].sort((a, b) => {
+        const aLive = a.detected_concern?.toLowerCase().includes('user requested volunteer');
+        const bLive = b.detected_concern?.toLowerCase().includes('user requested volunteer');
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
+        return 0;
+      });
+      
+      setCases(sorted);
     } catch (err) {
       setError('Failed to load active cases.');
       console.error(err);
@@ -40,6 +51,19 @@ export default function VolunteerCases() {
 
   useEffect(() => {
     fetchCases();
+
+    const socket = getSocket();
+    
+    socket.on('new_intervention_needed', (data: any) => {
+       console.log('🚨 Background refresh triggered by new case:', data);
+       
+       // Auto-fetch new data to show at top
+       fetchCases();
+    });
+
+    return () => {
+       socket.off('new_intervention_needed');
+    };
   }, []);
 
   const filteredCases = filter === 'all' 
@@ -47,7 +71,7 @@ export default function VolunteerCases() {
     : cases.filter(c => c.risk_level === filter);
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] pb-20">
+    <div className="min-h-screen bg-[#FDFDFF] pb-20 relative">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
