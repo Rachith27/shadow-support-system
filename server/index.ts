@@ -17,8 +17,46 @@ const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const app = express();
-app.use(cors({ origin: FRONTEND_URL }));
+
+// Robust CORS Configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://shadow-support-system.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean) as string[];
+
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in our allowed list or is a Vercel URL
+    const isAllowed = allowedOrigins.some(ao => origin === ao || origin === ao.replace(/\/$/, '')) || 
+                      origin.endsWith('.vercel.app');
+                      
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS blocked for origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// CORS diagnostic route
+app.get('/api/debug/cors', (req, res) => {
+  res.json({
+    origin: req.headers.origin || 'No origin',
+    allowedOrigins,
+    envFrontendUrl: process.env.FRONTEND_URL
+  });
+});
 
 // Fetch session history for volunteer context
 app.get('/api/session/:sessionId', async (req, res) => {
@@ -40,10 +78,7 @@ app.get('/api/session/:sessionId', async (req, res) => {
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_URL,
-    methods: ['GET', 'POST'],
-  },
+  cors: corsOptions, // Use the same robust options for Socket.io
 });
 
 io.on('connection', (socket) => {
