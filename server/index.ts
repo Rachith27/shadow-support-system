@@ -64,11 +64,20 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/session', sessionRoutes);
 
+// Root route for simple confirmation
+app.get('/', (req, res) => {
+  res.json({ 
+    message: "🚀 SSS Backend is alive and well!", 
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', info: 'API is functional' });
 });
 
 server.listen(PORT, () => {
-  console.log(`🚀 SSS Socket server running on port ${PORT}`);
+  console.log(`🚀 SSS Server is running on port ${PORT}`);
 });
