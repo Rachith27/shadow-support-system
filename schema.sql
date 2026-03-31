@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS volunteers (
 CREATE TABLE IF NOT EXISTS behavior_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reporter_type TEXT,
+    student_name TEXT,
+    school_name TEXT,
+    student_phone TEXT,
+    student_age INTEGER,
     age_group TEXT,
     mood TEXT,
     behavior_changes TEXT[],
@@ -47,6 +51,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS flagged_cases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     report_id UUID REFERENCES behavior_reports(id) ON DELETE SET NULL,
+    session_id TEXT, -- Link to live chat sessions
     age_group TEXT,
     risk_level TEXT CHECK (risk_level IN ('low', 'medium', 'high')),
     detected_concern TEXT,
@@ -64,6 +69,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     messages JSONB DEFAULT '[]'::JSONB, -- Stores array of { role, content, timestamp }
     analysis JSONB, -- Stores { emotion, situation, trigger, supportNeed, riskLevel }
     target_issue TEXT,
+    is_human_moderated BOOLEAN DEFAULT FALSE, -- Multi-role chat flag
+    exercise_completions JSONB DEFAULT '[]'::JSONB, -- List of { type, timestamp, finalMood }
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

@@ -12,13 +12,21 @@ export default function BehaviorReport() {
     behaviorChanges: string[];
     socialFlags: string[];
     notes: string;
+    studentName: string;
+    schoolName: string;
+    studentPhone: string;
+    studentAge: string;
   }>({ 
     reporterType: 'teacher', 
     ageGroup: '11-14', 
     mood: 'Sad', 
     behaviorChanges: [], 
     socialFlags: [], 
-    notes: '' 
+    notes: '',
+    studentName: '',
+    schoolName: '',
+    studentPhone: '',
+    studentAge: ''
   });
   
   const [submitted, setSubmitted] = useState(false);
@@ -76,6 +84,44 @@ export default function BehaviorReport() {
           <div className="bg-amber-50 shadow-sm text-amber-800 p-5 md:p-6 rounded-3xl text-sm font-semibold leading-relaxed border border-amber-200/50">
              <span className="font-bold uppercase tracking-widest text-[11px] block text-amber-600 mb-2">Note to Adults</span>
              This system uses AI to map behaviors to intervention tactics. We do not digitally diagnose. Please use factual observations.
+          </div>
+
+          {/* New Identification Section */}
+          <div className="space-y-6">
+            <label className="text-sm font-bold text-gray-400 tracking-widest uppercase flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">0</div> 
+              Student Identification
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input 
+                type="text" 
+                placeholder="Student Full Name" 
+                className="w-full bg-white border-2 border-gray-100 p-4 rounded-2xl text-base font-medium focus:outline-none focus:border-indigo-400 transition-all"
+                value={data.studentName}
+                onChange={e => setData({...data, studentName: e.target.value})}
+              />
+              <input 
+                type="text" 
+                placeholder="School Name" 
+                className="w-full bg-white border-2 border-gray-100 p-4 rounded-2xl text-base font-medium focus:outline-none focus:border-indigo-400 transition-all"
+                value={data.schoolName}
+                onChange={e => setData({...data, schoolName: e.target.value})}
+              />
+              <input 
+                type="number" 
+                placeholder="Student Age" 
+                className="w-full bg-white border-2 border-gray-100 p-4 rounded-2xl text-base font-medium focus:outline-none focus:border-indigo-400 transition-all"
+                value={data.studentAge}
+                onChange={e => setData({...data, studentAge: e.target.value})}
+              />
+              <input 
+                type="tel" 
+                placeholder="Student/Guardian Phone (Optional)" 
+                className="w-full bg-white border-2 border-gray-100 p-4 rounded-2xl text-base font-medium focus:outline-none focus:border-indigo-400 transition-all md:col-span-2"
+                value={data.studentPhone}
+                onChange={e => setData({...data, studentPhone: e.target.value})}
+              />
+            </div>
           </div>
 
           <div className="space-y-4">

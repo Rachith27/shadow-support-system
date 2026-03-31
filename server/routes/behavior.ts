@@ -37,6 +37,10 @@ router.post('/behavior/report', async (req, res) => {
       .from('behavior_reports')
       .insert({
           reporter_type: data.reporterType,
+          student_name: data.studentName,
+          school_name: data.schoolName,
+          student_phone: data.studentPhone,
+          student_age: data.studentAge ? parseInt(data.studentAge) : null,
           age_group: data.ageGroup,
           mood: data.mood,
           behavior_changes: data.behaviorChanges,
@@ -57,14 +61,17 @@ router.post('/behavior/report', async (req, res) => {
       const bArray = Array.isArray(data.behaviorChanges) ? data.behaviorChanges.join(', ') : "unknown behaviors";
       const focus = (data.behaviorChanges || []).includes('silent') ? 'School Withdrawal' : 'Emotional Distress';
       
+      const ageStr = data.studentAge ? ` (${data.studentAge}y)` : '';
+      const studentTag = data.studentName ? `${data.studentName}${ageStr} at ${data.schoolName || 'Unknown School'}` : 'a child';
+
       const { error: caseError } = await supabaseAdmin
         .from('flagged_cases')
         .insert({
             report_id: report.id,
             age_group: data.ageGroup,
             risk_level: risk,
-            detected_concern: `Possible Concern: ${focus}`,
-            ai_summary: `An adult proxy observed the child feeling ${data.mood || 'distressed'} and showing ${bArray}.`,
+            detected_concern: `Concern for ${studentTag}: ${focus}`,
+            ai_summary: `Observatory Report for ${studentTag}. The student was feeling ${data.mood || 'distressed'} and showing ${bArray}. Observer Context: ${data.notes || 'No extra notes provided.'}`,
             guidance: {
               approach: "Approach gently and observe first. Ensure a safe, private setting.",
               whatToSay: ["I'm here for you.", "Would you like to sit here? No pressure to talk."],
@@ -117,7 +124,30 @@ router.get('/cases/:id', volunteerOnly, async (req: AuthRequest, res: Response) 
       .single();
 
     if (error || !c) return res.status(404).json({ error: 'Not found' });
-    res.json(c);
+
+    // Fetch original report context if it exists (for Observatory reports)
+    let reportContext = null;
+    if (c.report_id) {
+        const { data: report } = await supabaseAdmin
+            .from('behavior_reports')
+            .select('*')
+            .eq('id', c.report_id)
+            .single();
+        reportContext = report;
+    }
+
+    // Fetch user context if it exists (for Live Chat sessions)
+    let sessionContext = null;
+    if (c.session_id) {
+        const { data: session } = await supabaseAdmin
+            .from('sessions')
+            .select('user_name, age_group, phone')
+            .eq('session_id', c.session_id)
+            .single();
+        sessionContext = session;
+    }
+
+    res.json({ ...c, reportContext, sessionContext });
   } catch (err) {
     res.status(500).json({ error: 'Failed to find case' });
   }

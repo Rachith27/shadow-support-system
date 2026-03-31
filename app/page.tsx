@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -55,8 +56,15 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <footer className="absolute bottom-8 text-sm text-text-muted/60 font-medium tracking-wide border-t border-slate-200 pt-4 px-8">
-        No account. No name. No judgment.
+      <footer className="absolute bottom-8 flex flex-col items-center gap-4">
+        <div className="flex items-center gap-6 text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-text-muted/40 transition-all">
+          <Link href="/volunteer/login" className="hover:text-emerald-600">Volunteer Hub</Link>
+          <div className="w-1 h-1 bg-slate-300 rounded-full" />
+          <Link href="/admin" className="hover:text-amber-600">Admin Console</Link>
+        </div>
+        <p className="text-sm text-text-muted/60 font-medium tracking-wide">
+          No account. No name. No judgment.
+        </p>
       </footer>
     </main>
   );

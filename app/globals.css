@@ -122,3 +122,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   background: #CBD5E1;
   border-radius: 10px;
 }
+
+/* Box Breathing Animation (16s cycle: 4-4-4-4) */
+@keyframes breathing {
+  0%, 100% { transform: scale(1); opacity: 0.3; }   /* Hold/Wait */
+  25% { transform: scale(1.5); opacity: 1; }      /* Inhale */
+  50% { transform: scale(1.5); opacity: 1; }      /* Hold */
+  75% { transform: scale(1); opacity: 0.3; }      /* Exhale */
+}
+
+.animate-breathing {
+  animation: breathing 16s linear infinite;
+}

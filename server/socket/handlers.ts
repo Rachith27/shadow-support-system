@@ -3,13 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { MoodCheckInPayload, UserMessagePayload, VentPayload } from '../../types';
 
 // Server-side Supabase client — bypasses RLS
-// We initialize this inside handlers to ensure process.env is loaded
 let supabaseServer: any;
 
 const getSupabaseServer = () => {
   if (!supabaseServer) {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Supabase environment variables are missing! Server features will not work.');
+      console.error('❌ Supabase environment variables are missing!');
       return null;
     }
     supabaseServer = createClient(
@@ -26,6 +25,7 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
 
   // ── MOOD CHECK-IN ──────────────────────────────────────────────
   socket.on('mood_checkin', async (payload: MoodCheckInPayload) => {
+    socket.join(payload.sessionId);
     try {
       const sentimentScore = EMOJI_SCORES[payload.emojiIndex];
       let blendedScore = sentimentScore;
@@ -45,189 +45,207 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
       const supabase = getSupabaseServer();
       if (!supabase) return;
 
-      // Update session in Supabase
-      await supabase
-        .from('sessions')
-        .update({
-          risk_score: riskScore,
-          risk_tier: riskTier,
-          last_active: new Date().toISOString(),
-        })
-        .eq('session_id', payload.sessionId);
+      await supabase.from('sessions').update({ 
+        risk_score: riskScore, 
+        risk_tier: riskTier,
+        last_active: new Date().toISOString()
+      }).eq('session_id', payload.sessionId);
 
-      // Insert event
-      await supabase.from('session_events').insert({
-        session_id: payload.sessionId,
-        event_type: 'mood_checkin',
-        sentiment_score: blendedScore,
-        mood_emoji: payload.emojiIndex,
-        slider_value: payload.sliderValue,
+      await supabase.from('session_events').insert({ 
+        session_id: payload.sessionId, 
+        event_type: 'mood_checkin', 
+        sentiment_score: blendedScore, 
+        mood_emoji: payload.emojiIndex, 
+        slider_value: payload.sliderValue 
       });
 
-      // Emit risk update back to client
+      if (riskTier === 'high') {
+         const { data: sessionInfo } = await supabase.from('sessions').select('age_group, user_name, phone').eq('session_id', payload.sessionId).maybeSingle();
+         await supabase.from('flagged_cases').insert({
+            session_id: payload.sessionId,
+            age_group: sessionInfo?.age_group || 'Unknown',
+            risk_level: 'high',
+            detected_concern: `Live Session Help Request: ${sessionInfo?.user_name || 'Anonymous User'}`,
+            ai_summary: `Student ${sessionInfo?.user_name || payload.sessionId.slice(0, 8)} has flagged as High Risk.`,
+            guidance: { 
+              approach: "Join via Safe Chat. Chat first protocol.", 
+              whatToSay: ["I'm here to support you."], 
+              dos: ["Chat first"], 
+              donts: ["Call immediately"] 
+            }
+         });
+      }
       socket.emit('risk_update', { riskTier, riskScore });
+    } catch (err) { console.error('Mood checkin error:', err); }
+  });
 
-      console.log(`📊 Mood check-in: session=${payload.sessionId.slice(0, 8)}... risk=${riskTier} (${riskScore})`);
-    } catch (err) {
-      console.error('Mood check-in error:', err);
+  // ── JOIN SESSION (Volunteers) ──────────────────────────────────
+  socket.on('join_session', async (payload: { sessionId: string; volunteerName?: string }) => {
+    socket.join(payload.sessionId);
+    console.log(`🙋 Volunteer joined room: ${payload.sessionId}`);
+    
+    const supabase = getSupabaseServer();
+    if (supabase) {
+      await supabase.from('sessions').update({ is_human_moderated: true }).eq('session_id', payload.sessionId);
     }
+    
+    io.to(payload.sessionId).emit('volunteer_joined', { 
+      volunteerName: payload.volunteerName || "SafeSpace Counselor" 
+    });
   });
 
   // ── USER MESSAGE ───────────────────────────────────────────────
   socket.on('user_message', async (payload: UserMessagePayload) => {
+    socket.join(payload.sessionId);
     try {
       const supabase = getSupabaseServer();
       if (!supabase) return;
 
-      // 1. Log event in session_events (telemetry)
-      await supabase.from('session_events').insert({
-        session_id: payload.sessionId,
-        event_type: 'message',
-        sentiment_score: null,
-        mood_emoji: null,
-        slider_value: null,
+      io.to(payload.sessionId).emit('user_message_broadcast', { 
+        text: payload.text, 
+        timestamp: Date.now() 
       });
 
-      // 2. Fetch current session history from 'sessions' table
-      const { data: sessionData, error: sessionFetchError } = await supabase
-        .from('sessions')
-        .select('messages')
-        .eq('session_id', payload.sessionId)
-        .single();
+      await supabase.from('session_events').insert({ session_id: payload.sessionId, event_type: 'message' });
 
-      if (sessionFetchError) {
-        console.error('Error fetching session history:', sessionFetchError);
+      const { data: sessionData } = await supabase.from('sessions').select('messages, is_human_moderated').eq('session_id', payload.sessionId).single();
+      const isModerated = sessionData?.is_human_moderated || false;
+      const history = sessionData?.messages || [];
+      const updatedHistory = [...history, { role: 'user', content: payload.text, timestamp: Date.now() }];
+
+      await supabase.from('sessions').update({ 
+        messages: updatedHistory, 
+        last_active: new Date().toISOString() 
+      }).eq('session_id', payload.sessionId);
+
+      if (isModerated) {
+          console.log(`🤖 AI silenced for session ${payload.sessionId}`);
+          return;
       }
 
-      const history = sessionData?.messages || [];
-      const newUserMessage = { role: 'user', content: payload.text, timestamp: Date.now() };
-      const updatedHistory = [...history, newUserMessage];
-
-      // Update last_active
-      await supabase
-        .from('sessions')
-        .update({ last_active: new Date().toISOString() })
-        .eq('session_id', payload.sessionId);
-
-      // Show typing indicator
       socket.emit('typing_indicator', { active: true });
 
       try {
         const apiKey = process.env.GROK_AI_API || process.env.GROQ_API_KEY;
-        if (!apiKey) {
-          throw new Error('Missing GROK_AI_API in .env.local');
-        }
+        if (!apiKey) throw new Error('Missing API Key');
 
-        // Dynamically fetch the latest mood from DB to adjust Tone
-        const { data: moodData } = await supabase
-          .from('session_events')
-          .select('mood_emoji')
-          .eq('session_id', payload.sessionId)
-          .eq('event_type', 'mood_checkin')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let toneInstruction = "Be caring but neutral.";
-        if (moodData && moodData.mood_emoji !== null) {
-          switch (moodData.mood_emoji) {
-            case 0:
-              toneInstruction = "The user is feeling terrible/highly stressed. Be incredibly gentle, deeply empathetic, and consoling. Wrap them in a verbal hug.";
-              break;
-            case 1:
-              toneInstruction = "The user is feeling down/anxious. Be highly supportive, validating, and caring.";
-              break;
-            case 2:
-              toneInstruction = "The user is feeling okay. Be friendly, neutral, and helpful.";
-              break;
-            case 3:
-              toneInstruction = "The user is feeling good. Be warm, upbeat, and encouraging.";
-              break;
-            case 4:
-              toneInstruction = "The user is feeling great! Be energetic, highly enthusiastic, and match their joyful energy!";
-              break;
-          }
-        }
-
-        const systemPrompt = `You are a supportive, non-judgmental active listener on an anonymous youth mental health platform. 
-        ${toneInstruction}
-        Keep the conversation flowing smoothly. Acknowledge their previous messages if relevant, but stay focused on the current topic.
-        Keep responses under 3 sentences. Never offer clinical advice or diagnoses. Just validate their feelings and make them feel heard.`;
-
-        // Prepare messages for Groq (Limit history to last 10 messages + system prompt)
         const groqMessages = [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: 'You are a supportive listener. Keep it under 3 sentences.' },
           ...updatedHistory.slice(-10).map((m: any) => ({ role: m.role, content: m.content }))
         ];
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
-            messages: groqMessages,
-            temperature: 0.7,
-            max_tokens: 150,
-          }),
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: groqMessages, temperature: 0.7 })
         });
 
         const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "I hear you.";
+        const finalHistory = [...updatedHistory, { role: 'assistant', content: reply.trim(), timestamp: Date.now() }];
         
-        if (data.error) {
-           console.error('Groq API Error details:', data.error);
-           throw new Error(data.error.message || 'Groq API error');
-        }
-
-        const reply = data.choices?.[0]?.message?.content || "I hear you, take your time.";
-        const newAssistantMessage = { role: 'assistant', content: reply.trim(), timestamp: Date.now() };
-
-        // Save conversation history back to Supabase
-        const finalHistory = [...updatedHistory, newAssistantMessage];
-        await supabase
-          .from('sessions')
-          .update({ messages: finalHistory })
-          .eq('session_id', payload.sessionId);
+        await supabase.from('sessions').update({ messages: finalHistory }).eq('session_id', payload.sessionId);
 
         socket.emit('typing_indicator', { active: false });
-        socket.emit('system_message', { text: reply.trim() });
+        io.to(payload.sessionId).emit('system_message', { text: reply.trim() });
       } catch (aiError) {
-        console.error('Groq fetch error:', aiError);
         socket.emit('typing_indicator', { active: false });
-        socket.emit('system_message', {
-          text: "I hear you. (AI context limit reached or API offline).",
-        });
+        socket.emit('system_message', { text: "I hear you." });
       }
+    } catch (err) { console.error('User message error:', err); }
+  });
 
-      console.log(`💬 Message from session=${payload.sessionId.slice(0, 8)}...`);
-    } catch (err) {
-      console.error('User message error:', err);
-    }
+  // ── VOLUNTEER MESSAGE ──────────────────────────────────────────
+  socket.on('volunteer_message', async (payload: { sessionId: string; text: string; volunteerName?: string }) => {
+    try {
+      const supabase = getSupabaseServer();
+      if (!supabase) return;
+
+      const { data: sessionData } = await supabase.from('sessions').select('messages').eq('session_id', payload.sessionId).single();
+      const history = sessionData?.messages || [];
+      const newMsg = { role: 'volunteer', content: payload.text, volunteerName: payload.volunteerName, timestamp: Date.now() };
+      
+      await supabase.from('sessions').update({ 
+        messages: [...history, newMsg],
+        last_active: new Date().toISOString(),
+        is_human_moderated: true 
+      }).eq('session_id', payload.sessionId);
+
+      io.to(payload.sessionId).emit('volunteer_message_broadcast', {
+        text: payload.text,
+        volunteerName: payload.volunteerName || "Counselor",
+        timestamp: Date.now()
+      });
+    } catch (err) { console.error('Volunteer message error:', err); }
+  });
+
+  // ── EXERCISE COMPLETE ──────────────────────────────────────────
+  socket.on('exercise_complete', async (payload: { sessionId: string; exerciseType: string; moodScore: number; timestamp: number }) => {
+    try {
+      const supabase = getSupabaseServer();
+      if (!supabase) return;
+
+      const { data: sessionData } = await supabase.from('sessions').select('exercise_completions, risk_score').eq('session_id', payload.sessionId).single();
+      const completions = sessionData?.exercise_completions || [];
+      const updatedCompletions = [...completions, { type: payload.exerciseType, mood: payload.moodScore, timestamp: payload.timestamp }];
+
+      // Potentially lower risk if mood is high (4-5)
+      let newRiskScore = sessionData?.risk_score || 0;
+      if (payload.moodScore >= 4) newRiskScore = Math.max(0, newRiskScore - 0.1);
+      
+      let newRiskTier: 'low' | 'medium' | 'high' = 'low';
+      if (newRiskScore >= 0.6) newRiskTier = 'high';
+      else if (newRiskScore >= 0.3) newRiskTier = 'medium';
+
+      await supabase.from('sessions').update({ 
+        exercise_completions: updatedCompletions,
+        risk_score: newRiskScore,
+        risk_tier: newRiskTier,
+        last_active: new Date().toISOString()
+      }).eq('session_id', payload.sessionId);
+
+      await supabase.from('session_events').insert({ 
+        session_id: payload.sessionId, 
+        event_type: 'exercise_complete',
+        sentiment_score: payload.moodScore / 5 // Normalized 0-1
+      });
+
+      socket.emit('risk_update', { riskTier: newRiskTier, riskScore: newRiskScore });
+      console.log(`🌿 Exercise ${payload.exerciseType} completed for ${payload.sessionId}`);
+    } catch (err) { console.error('Exercise complete error:', err); }
+  });
+
+  // ── REQUEST REFRAME ─────────────────────────────────────────────
+  socket.on('request_reframe', async (payload: { sessionId: string; thought: string }) => {
+    try {
+      const apiKey = process.env.GROK_AI_API || process.env.GROQ_API_KEY;
+      if (!apiKey) return;
+
+      const reframeMessages = [
+        { role: 'system', content: 'You are a supportive counselor. Take the following distressing thought and provide one short, realistic cognitive reframe that is compassionate and balanced. Max 2 sentences.' },
+        { role: 'user', content: payload.thought }
+      ];
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: reframeMessages, temperature: 0.5 })
+      });
+
+      const data = await response.json();
+      const reframe = data.choices?.[0]?.message?.content || "I understand this is hard. Let's try to look at it one step at a time.";
+      socket.emit('reframe_response', { text: reframe.trim() });
+    } catch (err) { console.error('Reframe error:', err); }
   });
 
   // ── VENT MESSAGE ───────────────────────────────────────────────
   socket.on('vent_message', async (payload: VentPayload) => {
+    socket.join(payload.sessionId);
     try {
-      // Log that a vent happened — no text content, no sentiment
       const supabase = getSupabaseServer();
       if (!supabase) return;
-      await supabase.from('session_events').insert({
-        session_id: payload.sessionId,
-        event_type: 'vent',
-      });
-
-      // Update last_active
-      await supabase
-        .from('sessions')
-        .update({ last_active: new Date().toISOString() })
-        .eq('session_id', payload.sessionId);
-
-      // No response event — vent mode is one-way
-      console.log(`🌊 Vent from session=${payload.sessionId.slice(0, 8)}...`);
-    } catch (err) {
-      console.error('Vent message error:', err);
-    }
+      await supabase.from('session_events').insert({ session_id: payload.sessionId, event_type: 'vent' });
+      await supabase.from('sessions').update({ last_active: new Date().toISOString() }).eq('session_id', payload.sessionId);
+    } catch (err) { console.error('Vent error:', err); }
   });
 }

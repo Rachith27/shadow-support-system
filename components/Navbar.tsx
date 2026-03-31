@@ -41,7 +41,6 @@ export default function Navbar() {
     { name: 'Safe Chat', href: '/chat', icon: MessageSquare },
     { name: 'Observatory', href: '/behavior/report', icon: ShieldAlert },
     { name: 'Events', href: '/events', icon: Calendar },
-    { name: 'Child Mode', href: '/child-mode', icon: Baby },
   ];
 
   const authLinks = [];
@@ -52,10 +51,18 @@ export default function Navbar() {
     authLinks.push({ name: 'Volunteer Panel', href: '/volunteer/dashboard', icon: LayoutDashboard });
   }
   if (!isAdmin && !isVolunteer) {
-    authLinks.push({ name: 'Team Access', href: '/volunteer/login', icon: UserCircle });
+    authLinks.push({ name: 'Volunteer Hub', href: '/volunteer/login', icon: UserCircle });
+    authLinks.push({ name: 'Admin Portal', href: '/admin', icon: ShieldCheck });
   }
 
   const isActive = (path: string) => pathname === path;
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('volunteerToken');
+    localStorage.removeItem('volunteerUser');
+    window.location.href = '/';
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100 h-16 md:h-20 transition-all duration-300">
@@ -100,6 +107,15 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
+          {(isAdmin || isVolunteer) && (
+            <button 
+              onClick={handleLogout}
+              className="ml-2 px-4 py-2 rounded-full text-sm font-bold text-rose-600 hover:bg-rose-50 transition-all duration-200 flex items-center gap-2"
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
+          )}
         </div>
 
         {/* Mobile Toggle */}
@@ -130,6 +146,17 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
+            {(isAdmin || isVolunteer) && (
+              <button 
+                onClick={handleLogout}
+                className="w-full mt-4 p-5 rounded-[1.5rem] flex items-center gap-4 text-lg font-extrabold text-rose-600 hover:bg-rose-50 transition"
+              >
+                <div className="p-2 rounded-xl bg-rose-100 text-rose-600">
+                  <LogOut size={22} />
+                </div>
+                Logout
+              </button>
+            )}
          </div>
       </div>
     </nav>

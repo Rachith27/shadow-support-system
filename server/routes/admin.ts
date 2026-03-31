@@ -44,21 +44,76 @@ router.get('/dashboard', adminOnly, async (req: AuthRequest, res: Response) => {
     const { count: totalSessions } = await supabaseAdmin.from('sessions').select('*', { count: 'exact', head: true });
     const { count: totalBehaviorReports } = await supabaseAdmin.from('behavior_reports').select('*', { count: 'exact', head: true });
     const { count: flaggedCasesCounts } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true });
-    const { count: pendingVolunteersCount } = await supabaseAdmin.from('volunteers').select('*', { count: 'exact', head: true }).eq('status', 'pending');
     
+    // Risk Levels for Flagged Cases
     const { count: high } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'high');
     const { count: medium } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'medium');
     const { count: low } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'low');
 
+    // Topic Aggregation (from completed sessions)
+    const { data: topicsData } = await supabaseAdmin
+      .from('sessions')
+      .select('topic_category')
+      .not('topic_category', 'is', null);
+    
+    const topicCounts: Record<string, number> = {};
+    topicsData?.forEach(s => {
+      topicCounts[s.topic_category] = (topicCounts[s.topic_category] || 0) + 1;
+    });
+
+    // Age Group Aggregation
+    const { data: ageData } = await supabaseAdmin
+      .from('sessions')
+      .select('age_group_segment')
+      .not('age_group_segment', 'is', null);
+    
+    const ageCounts: Record<string, number> = {};
+    ageData?.forEach(s => {
+      ageCounts[s.age_group_segment] = (ageCounts[s.age_group_segment] || 0) + 1;
+    });
+
+    // Detailed Session Insights
+    const { data: recentSessions } = await supabaseAdmin
+      .from('sessions')
+      .select('id, session_id, age_group_segment, topic_category, ai_summary, created_at')
+      .eq('is_completed', true)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     const { data: volunteers } = await supabaseAdmin.from('volunteers').select('*').order('created_at', { ascending: false });
+    
+    // Behavior Reports Log
+    const { data: behaviorReports } = await supabaseAdmin
+      .from('behavior_reports')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    // Exercise Adherence (Medium/High Risk Users)
+    const { data: medHighSessions, error: adherenceError } = await supabaseAdmin
+      .from('sessions')
+      .select('exercise_completions')
+      .in('risk_tier', ['medium', 'high']);
+    
+    let adherenceCount = 0;
+    const totalMedHigh = medHighSessions?.length || 0;
+    medHighSessions?.forEach(s => {
+       if (Array.isArray(s.exercise_completions) && s.exercise_completions.length > 0) {
+          adherenceCount++;
+       }
+    });
+    const exerciseAdherence = totalMedHigh > 0 ? Math.round((adherenceCount / totalMedHigh) * 100) : 0;
 
     res.json({
       totalSessions: totalSessions || 0,
       totalBehaviorReports: totalBehaviorReports || 0,
       flaggedCasesCounts: flaggedCasesCounts || 0,
-      pendingVolunteersCount: pendingVolunteersCount || 0,
       riskLevels: { high: high || 0, medium: medium || 0, low: low || 0 },
-      volunteers: volunteers || []
+      topicInsights: topicCounts,
+      ageInsights: ageCounts,
+      recentInsights: recentSessions || [],
+      volunteers: volunteers || [],
+      behaviorReports: behaviorReports || [],
+      exerciseAdherence
     });
   } catch(err) {
     console.error("Dashboard Error:", err);

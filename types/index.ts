@@ -19,9 +19,11 @@ export interface MoodEntry {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'system';
+  role: 'user' | 'system' | 'assistant' | 'volunteer';
   text: string;
   timestamp: number;
+  volunteerName?: string;
+  isVolunteer?: boolean;
 }
 
 // Supabase row types

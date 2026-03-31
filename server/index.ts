@@ -10,12 +10,30 @@ import volunteerRoutes from './routes/volunteer';
 import adminRoutes from './routes/admin';
 import eventRoutes from './routes/events';
 import sessionRoutes from './routes/session';
+import { supabaseAdmin } from '../lib/supabase';
 
 const PORT = process.env.PORT || 4000;
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
+
+// Fetch session history for volunteer context
+app.get('/api/session/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { data, error } = await supabaseAdmin
+            .from('sessions')
+            .select('*')
+            .eq('session_id', sessionId)
+            .single();
+
+        if (error || !data) return res.status(404).json({ error: 'Session not found' });
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 const server = http.createServer(app);
 

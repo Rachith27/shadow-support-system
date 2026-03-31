@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   User,
+  LogOut
 } from "lucide-react";
 
 interface VolunteerData {
@@ -20,6 +21,12 @@ interface VolunteerData {
 
 export default function VolunteerDashboard() {
   const [volunteer, setVolunteer] = useState<VolunteerData | null>(null);
+
+  const handleLogout = () => {
+    localStorage.removeItem("volunteerToken");
+    localStorage.removeItem("volunteerUser");
+    window.location.href = "/";
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem("volunteerUser");
@@ -35,10 +42,19 @@ export default function VolunteerDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-teal-50">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-600">
-          <ArrowLeft size={16} />
-          Back to Home
-        </Link>
+        <div className="flex justify-between items-center">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-emerald-600 transition">
+            <ArrowLeft size={16} />
+            Back to Home
+          </Link>
+          <button 
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 text-sm font-bold text-rose-600 hover:text-rose-700 transition"
+          >
+            <LogOut size={16} />
+            Sign Out
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-1 space-y-6">

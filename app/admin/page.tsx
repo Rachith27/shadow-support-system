@@ -22,13 +22,26 @@ interface Volunteer {
   skills: string[];
 }
 
+interface InsightSession {
+  id: string;
+  session_id: string;
+  age_group_segment: string;
+  topic_category: string;
+  ai_summary: string;
+  created_at: string;
+}
+
 interface DashboardData {
   totalSessions: number;
   totalBehaviorReports: number;
   flaggedCasesCounts: number;
-  pendingVolunteersCount: number;
   riskLevels: { high: number; medium: number; low: number };
+  topicInsights: Record<string, number>;
+  ageInsights: Record<string, number>;
+  recentInsights: InsightSession[];
   volunteers: Volunteer[];
+  behaviorReports: any[];
+  exerciseAdherence: number;
 }
 
 export default function AdminDashboard() {
@@ -38,10 +51,52 @@ export default function AdminDashboard() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<'summary' | 'insights' | 'volunteers' | 'reports'>('summary');
   const [mounted, setMounted] = useState(false);
   const nav = useRouter();
 
-  const API_BASE = 'http://localhost:4000/api'; // Express backend URL
+  const API_BASE = 'http://localhost:4000/api';
+
+  const fetchData = () => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+    setLoading(true);
+    fetch(`${API_BASE}/admin/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (!r.ok) {
+          localStorage.removeItem('adminToken');
+          setIsLoggedIn(false);
+          setLoading(false);
+          return null;
+        }
+        return r.json();
+      })
+      .then((d: any) => {
+        if (!d) return;
+        setData({
+          ...d,
+          riskLevels: d.riskLevels || { high: 0, medium: 0, low: 0 },
+          topicInsights: d.topicInsights || {},
+          ageInsights: d.ageInsights || {},
+          recentInsights: d.recentInsights || [],
+          volunteers: (d.volunteers || []).map((v: any) => ({
+              id: v.id,
+              fullName: v.full_name || v.fullName,
+              email: v.email,
+              status: v.status,
+              location: v.location,
+              phone: v.phone,
+              motivation: v.motivation,
+              skills: v.skills || []
+          })),
+          behaviorReports: d.behaviorReports || [],
+          exerciseAdherence: d.exerciseAdherence || 0
+        } as DashboardData);
+        setLoading(false);
+      });
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,43 +120,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchData = () => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) return;
-    setLoading(true);
-    fetch(`${API_BASE}/admin/dashboard`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => {
-        if (!r.ok) {
-          // Token is invalid/expired — clear it and show login
-          localStorage.removeItem('adminToken');
-          setIsLoggedIn(false);
-          setLoading(false);
-          return null;
-        }
-        return r.json();
-      })
-      .then((d) => {
-        if (!d) return;
-        setData({
-          ...d,
-          riskLevels: d.riskLevels || { high: 0, medium: 0, low: 0 },
-          volunteers: (d.volunteers || []).map((v: any) => ({
-              id: v.id,
-              fullName: v.full_name || v.fullName,
-              email: v.email,
-              status: v.status,
-              location: v.location,
-              phone: v.phone,
-              motivation: v.motivation,
-              skills: v.skills || []
-          }))
-        } as DashboardData);
-        setLoading(false);
-      });
-  };
-
   const changeStatus = async (id: string, status: string) => {
     await fetch(`${API_BASE}/admin/volunteers/${id}/status`, {
       method: 'PATCH',
@@ -116,34 +134,27 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    // Basic check for token on mount, if it exists try to fetch data
     if (typeof window !== 'undefined' && localStorage.getItem('adminToken')) {
         setIsLoggedIn(true);
         fetchData();
     }
   }, []);
 
-  // Prevent hydration mismatch - show nothing until mounted
   if (!mounted) return <div className="min-h-screen bg-gray-900" />;
 
   if (!isLoggedIn) {
     return (
       <div className="flex flex-col min-h-screen bg-gray-900 justify-center items-center px-6 relative overflow-hidden">
-        
-        {/* Deep Tech Admin Decor */}
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/20 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-500/20 rounded-full blur-[100px] pointer-events-none" />
-
         <div className="w-full max-w-[28rem] relative z-10">
           <div className="text-center mb-8">
             <ShieldCheck size={60} className="text-emerald-400 mx-auto mb-4" />
             <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">System Admin.</h1>
             <p className="text-gray-400 mt-2 text-sm uppercase tracking-widest font-bold">Authorized Personnel Only</p>
           </div>
-
           <form onSubmit={handleLogin} className="bg-gray-800/80 backdrop-blur-2xl rounded-[3rem] p-8 md:p-10 shadow-2xl border border-gray-700">
             {error && <div className="bg-red-500/10 text-red-400 border border-red-500/30 p-4 rounded-xl text-sm font-bold flex items-center mb-6"><AlertTriangle size={16} className="mr-2"/>{error}</div>}
-            
             <label className="block mb-4">
               <span className="text-xs font-bold text-gray-500 tracking-widest uppercase mb-2 block">Admin Email</span>
               <input required type="email" placeholder="admin@safespace.org" className="w-full bg-gray-900 text-white rounded-2xl p-4 border border-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 font-medium transition" onChange={(e) => setLoginEmail(e.target.value)} />
@@ -152,7 +163,6 @@ export default function AdminDashboard() {
               <span className="text-xs font-bold text-gray-500 tracking-widest uppercase mb-2 block">Master Password</span>
               <input required type="password" placeholder="••••••••" className="w-full bg-gray-900 text-white rounded-2xl p-4 border border-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 font-medium transition" onChange={(e) => setLoginPassword(e.target.value)} />
             </label>
-
             <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-extrabold p-5 rounded-full text-lg shadow-xl shadow-emerald-500/20 transition hover:-translate-y-1 active:scale-[0.98]">
               Authenticate & Enter
             </button>
@@ -166,126 +176,272 @@ export default function AdminDashboard() {
   if (!data) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-emerald-400 font-extrabold tracking-widest uppercase text-sm animate-pulse">Decrypting Console...</div>;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 pb-16">
-      {/* Premium Desktop Header */}
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC] pb-16">
+      {/* Header */}
       <div className="bg-gray-900 pt-10 pb-20 px-6 md:px-12 text-white relative">
          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center relative z-10">
-           
            <div className="flex items-center gap-4 mb-6 md:mb-0">
               <div className="bg-gray-800 p-4 rounded-2xl"><ShieldCheck size={32} className="text-emerald-400"/></div>
               <div>
-                <h1 className="text-3xl md:text-4xl font-black tracking-tight tracking-tight">Command Center</h1>
-                <p className="text-gray-400 font-medium text-sm md:text-base mt-1">Platform Telemetry & Team Moderation</p>
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight">Command Center</h1>
+                <p className="text-gray-400 font-medium text-sm md:text-base mt-1">Youth Mental Health Oversight</p>
               </div>
            </div>
-
-           <div className="flex gap-4">
-              <button disabled={loading} onClick={fetchData} className="bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 p-4 aspect-square rounded-[1rem] transition flex items-center justify-center border border-gray-700 shadow-xl">
+            <div className="flex gap-4">
+              <button disabled={loading} onClick={fetchData} className="bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 p-4 aspect-square rounded-[1rem] transition border border-gray-700 shadow-xl">
                  <RefreshCw size={22} className={loading ? 'animate-spin text-emerald-400' : ''} />
               </button>
-              <button onClick={() => { localStorage.removeItem('adminToken'); setIsLoggedIn(false); nav.push('/'); }} className="bg-emerald-500/10 text-emerald-400 font-extrabold px-6 py-4 rounded-[1rem] hover:bg-emerald-500/20 flex items-center shadow-inner transition border border-emerald-500/20">
-                <LogOut size={20} className="mr-3" /> Terminate Session
+              <button 
+                onClick={() => { 
+                  localStorage.removeItem('adminToken'); 
+                  localStorage.removeItem('volunteerToken'); 
+                  localStorage.removeItem('volunteerUser'); 
+                  window.location.href = '/'; 
+                }} 
+                className="bg-emerald-500/10 text-emerald-400 font-extrabold px-6 py-4 rounded-[1rem] hover:bg-emerald-500/20 shadow-inner transition border border-emerald-500/20 flex items-center gap-2"
+              >
+                <LogOut size={20} />
+                <span>Logout</span>
               </button>
            </div>
-           
          </div>
       </div>
 
-      {/* Grid shifts up to overlap header elegantly */}
-      <div className="max-w-7xl mx-auto w-full px-6 md:px-12 -mt-10 relative z-20 space-y-8">
+      <div className="max-w-7xl mx-auto w-full px-6 md:px-12 -mt-10 relative z-20">
         
-        {/* Metric Row -> 4 columns on large screens! */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <div className="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-gray-100 flex items-center transform hover:-translate-y-1 transition duration-300">
-             <div className="bg-sky-50 text-sky-500 p-4 rounded-[1rem] mr-4"><Activity size={24}/></div>
-             <div>
-                <p className="text-[10px] md:text-xs font-bold text-gray-400 tracking-widest uppercase line-clamp-1">Total Chat Sessions</p>
-                <p className="text-2xl md:text-3xl font-black text-gray-800">{data.totalSessions}</p>
-             </div>
-          </div>
-          
-          <div className="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-gray-100 flex items-center transform hover:-translate-y-1 transition duration-300">
-             <div className="bg-orange-50 text-orange-500 p-4 rounded-[1rem] mr-4"><Activity size={24}/></div>
-             <div>
-                <p className="text-[10px] md:text-xs font-bold text-gray-400 tracking-widest uppercase line-clamp-1">Behavior Reports</p>
-                <p className="text-2xl md:text-3xl font-black text-gray-800">{data.totalBehaviorReports}</p>
-             </div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-gray-100 flex items-center transform hover:-translate-y-1 transition duration-300">
-             <div className="bg-rose-50 text-rose-500 p-4 rounded-[1rem] mr-4"><AlertTriangle size={24}/></div>
-             <div>
-                <p className="text-[10px] md:text-xs font-bold text-gray-400 tracking-widest uppercase line-clamp-1">High-Risk Cases</p>
-                <p className="text-2xl md:text-3xl font-black text-rose-600">{data.riskLevels?.high ?? 0}</p>
-             </div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-gray-100 flex items-center transform hover:-translate-y-1 transition duration-300">
-             <div className="bg-emerald-50 text-emerald-500 p-4 rounded-[1rem] mr-4"><Users size={24}/></div>
-             <div>
-                <p className="text-[10px] md:text-xs font-bold text-gray-400 tracking-widest uppercase line-clamp-1">Pending Volunteers</p>
-                <p className="text-2xl md:text-3xl font-black text-gray-800">{data.pendingVolunteersCount}</p>
-             </div>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 mb-8 bg-white/50 backdrop-blur-md p-1.5 rounded-[1.8rem] border border-gray-100 shadow-xl w-fit">
+          {[
+            { id: 'summary', label: 'Summary', icon: Activity },
+            { id: 'insights', label: 'Insights & Trends', icon: Activity },
+            { id: 'reports', label: 'Observatory Logs', icon: ShieldCheck },
+            { id: 'volunteers', label: 'Volunteers', icon: Users }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-6 py-3 rounded-[1.5rem] font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2
+                ${activeTab === tab.id ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600 hover:bg-white'}`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Volunteer List spans full width but nicely formatted */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-xl border border-gray-100 p-8 md:p-10">
-          <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 tracking-tight mb-8">Volunteer Moderation Queue</h2>
-          
-          {data.volunteers.length === 0 ? (
-            <p className="text-sm text-gray-400 font-bold uppercase tracking-widest py-10 text-center bg-gray-50 rounded-3xl border border-dashed">No sign-ups recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto w-full">
+        {activeTab === 'summary' && (
+          <div className="space-y-8 animate-in fade-in slide-in-top-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-100 transform hover:-translate-y-1 transition duration-300">
+                 <div className="bg-sky-50 text-sky-500 w-12 h-12 rounded-[1rem] flex items-center justify-center mb-4"><Activity size={24}/></div>
+                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Total Sessions</p>
+                 <p className="text-3xl font-black text-gray-800 mt-1">{data.totalSessions}</p>
+              </div>
+              <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-100 transform hover:-translate-y-1 transition duration-300">
+                 <div className="bg-orange-50 text-orange-500 w-12 h-12 rounded-[1rem] flex items-center justify-center mb-4"><Activity size={24}/></div>
+                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Reports Logged</p>
+                 <p className="text-3xl font-black text-gray-800 mt-1">{data.totalBehaviorReports}</p>
+              </div>
+              <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-100 transform hover:-translate-y-1 transition duration-300">
+                 <div className="bg-rose-50 text-rose-500 w-12 h-12 rounded-[1rem] flex items-center justify-center mb-4"><AlertTriangle size={24}/></div>
+                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">High Distress</p>
+                 <p className="text-3xl font-black text-rose-600 mt-1">{data.riskLevels.high}</p>
+              </div>
+              <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-gray-100 transform hover:-translate-y-1 transition duration-300">
+                 <div className="bg-emerald-50 text-emerald-500 w-12 h-12 rounded-[1rem] flex items-center justify-center mb-4"><Users size={24}/></div>
+                 <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Support Team</p>
+                 <p className="text-3xl font-black text-gray-800 mt-1">{data.volunteers.length}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8">
+               <h2 className="text-xl font-black text-gray-900 mb-6 px-2 italic">Emerging Problem Areas</h2>
+               <div className="grid md:grid-cols-3 gap-4">
+                  {Object.entries(data.topicInsights).sort((a,b) => b[1] - a[1]).slice(0, 3).map(([topic, count]) => (
+                    <div key={topic} className="bg-gray-50 border border-gray-100 p-6 rounded-3xl group hover:bg-emerald-600 transition-colors duration-300">
+                       <p className="text-xs font-black text-emerald-600 uppercase tracking-widest group-hover:text-emerald-100 transition-colors mb-1">{count} Cases Identified</p>
+                       <h3 className="text-xl font-black text-gray-800 group-hover:text-white transition-colors">{topic}</h3>
+                    </div>
+                  ))}
+                  {Object.keys(data.topicInsights).length === 0 && <p className="col-span-3 py-12 text-center text-gray-400 font-bold uppercase tracking-widest border border-dashed rounded-3xl">Collecting data for analysis...</p>}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'insights' && (
+          <div className="space-y-8 animate-in fade-in slide-in-top-4">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Topic Distribution */}
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100">
+                <h3 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-widest">Main Issues by Category</h3>
+                <div className="space-y-4">
+                   {Object.entries(data.topicInsights).map(([topic, count]) => (
+                     <div key={topic}>
+                        <div className="flex justify-between text-xs font-bold uppercase tracking-tighter mb-2">
+                           <span className="text-gray-600">{topic}</span>
+                           <span className="text-emerald-600">{count}</span>
+                        </div>
+                        <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
+                           <div 
+                             className="h-full bg-emerald-500 transition-all duration-1000" 
+                             style={{ width: `${(count / data.totalSessions) * 100}%` }}
+                           />
+                        </div>
+                     </div>
+                   ))}
+                </div>
+              </div>
+
+              {/* Age Group Trends */}
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100">
+                <h3 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-widest">User Demographics (Age)</h3>
+                <div className="space-y-4">
+                   {Object.entries(data.ageInsights).map(([age, count]) => (
+                     <div key={age}>
+                        <div className="flex justify-between text-xs font-bold uppercase tracking-tighter mb-2">
+                           <span className="text-gray-600">{age} yrs</span>
+                           <span className="text-cyan-600">{count}</span>
+                        </div>
+                        <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
+                           <div 
+                             className="h-full bg-cyan-500 transition-all duration-1000" 
+                             style={{ width: `${(count / data.totalSessions) * 100}%` }}
+                           />
+                        </div>
+                     </div>
+                   ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Analysis Feed */}
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100">
+               <h3 className="text-lg font-black text-gray-900 mb-8 uppercase tracking-widest px-2">Longitudinal Session Analysis</h3>
+               <div className="space-y-4">
+                  {data.recentInsights.map(s => (
+                    <div key={s.id} className="bg-gray-50 rounded-3xl p-6 border border-gray-100 hover:shadow-md transition">
+                       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+                          <div className="flex items-center gap-3">
+                             <div className="bg-white px-4 py-2 rounded-xl text-[10px] font-black text-emerald-600 border border-emerald-100 uppercase tracking-widest">
+                                {s.topic_category}
+                             </div>
+                             <div className="bg-white px-4 py-2 rounded-xl text-[10px] font-black text-gray-400 border border-gray-100 uppercase tracking-widest">
+                                Age {s.age_group_segment}
+                             </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                             {new Date(s.created_at).toLocaleDateString()} at {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                       </div>
+                       <p className="text-gray-700 leading-relaxed font-medium italic">"{s.ai_summary}"</p>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8 md:p-10 animate-in fade-in slide-in-top-4">
+            <h2 className="text-xl font-black text-gray-900 tracking-tight mb-8 italic">Comprehensive Observatory Logs</h2>
+            <div className="space-y-6">
+              {data.behaviorReports.map((r) => (
+                <div key={r.id} className="bg-gray-50 border border-gray-100 p-8 rounded-[2rem] hover:shadow-lg transition duration-300">
+                   <div className="flex flex-col lg:flex-row justify-between gap-6 mb-6">
+                      <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
+                            {r.student_name?.[0] || '?'}
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-black text-gray-900">{r.student_name || 'Anonymous Student'}</h3>
+                            <div className="flex items-center gap-3 mt-1 text-xs font-bold uppercase tracking-widest text-gray-400">
+                               <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{r.student_age ? `${r.student_age} yrs` : 'Age Unknown'}</span>
+                               <span>at {r.school_name || 'Unknown School'}</span>
+                            </div>
+                         </div>
+                      </div>
+                      <div className="flex flex-col lg:items-end gap-2 text-right">
+                         <span className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm">
+                            {new Date(r.timestamp).toLocaleDateString()} at {new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                         </span>
+                         {r.student_phone && <span className="text-xs font-bold text-sky-600">Contact: {r.student_phone}</span>}
+                      </div>
+                   </div>
+
+                   <div className="grid md:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+                      <div className="space-y-4">
+                         <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Observation Mood</p>
+                            <span className="bg-white px-4 py-2 rounded-xl text-sm font-bold text-gray-700 border border-gray-100 shadow-sm">{r.mood}</span>
+                         </div>
+                         <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Behavior Changes</p>
+                            <div className="flex flex-wrap gap-2">
+                               {(r.behavior_changes || []).map((c: string) => (
+                                 <span key={c} className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100">{c}</span>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
+                      <div className="bg-white/50 p-6 rounded-3xl border border-gray-100">
+                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 italic">Reporter Context & Notes</p>
+                         <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                            {r.notes ? `"${r.notes}"` : "No extra context provided by the reporter."}
+                         </p>
+                      </div>
+                   </div>
+                </div>
+              ))}
+              {data.behaviorReports.length === 0 && (
+                <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-[3rem]">
+                   <p className="text-gray-400 font-bold uppercase tracking-widest">No observations recorded yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'volunteers' && (
+          <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 p-8 md:p-10 animate-in fade-in slide-in-top-4">
+            <h2 className="text-xl font-black text-gray-900 tracking-tight mb-8">Support Team Moderation</h2>
+            <div className="overflow-x-auto">
               <div className="min-w-[800px] flex flex-col gap-3">
-                
-                {/* Custom Table Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-3 text-[11px] font-black tracking-widest uppercase text-gray-400 border-b-2 border-gray-100 mb-2">
                   <div className="col-span-3">Profile Identity</div>
-                  <div className="col-span-3">Contact & Area</div>
-                  <div className="col-span-3">Motivation/Skills</div>
-                  <div className="col-span-3 text-right">Moderation Action</div>
+                  <div className="col-span-3">Contact Details</div>
+                  <div className="col-span-3">Motivation & Skills</div>
+                  <div className="col-span-3 text-right">Moderation</div>
                 </div>
-
                 {data.volunteers.map((v) => (
                   <div key={v.id} className="grid grid-cols-12 gap-4 items-center bg-white border border-gray-100 p-4 px-6 rounded-3xl hover:shadow-md transition">
-                    
                     <div className="col-span-3">
                       <p className="font-extrabold text-gray-900">{v.fullName}</p>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mt-1">Status: <span className={v.status === 'approved' ? 'text-emerald-500' : v.status === 'rejected' ? 'text-red-500' : 'text-amber-500'}>{v.status}</span></p>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${v.status === 'approved' ? 'text-emerald-500' : 'text-amber-500'}`}>{v.status}</p>
                     </div>
-                    
-                    <div className="col-span-3 text-sm font-medium text-gray-600 space-y-1">
+                    <div className="col-span-3 text-sm font-medium text-gray-600">
                       <p className="text-sky-600 font-bold">{v.email}</p>
-                      <p>{v.location}</p>
-                      <p className="text-xs text-gray-400">{v.phone}</p>
+                      <p className="text-xs text-gray-400 mt-1">{v.location}</p>
                     </div>
-
                     <div className="col-span-3 text-sm">
-                      <p className="text-gray-600 line-clamp-2 italic mb-2">"{v.motivation}"</p>
-                      <div className="flex flex-wrap gap-1">
-                        {(v.skills || []).map(s=><span key={s} className="bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md">{s}</span>)}
-                      </div>
+                      <p className="text-gray-600 line-clamp-2 italic text-xs">"{v.motivation}"</p>
                     </div>
-
                     <div className="col-span-3 flex justify-end gap-2">
-                      {v.status === 'pending' && (
+                      {v.status === 'pending' ? (
                         <>
-                          <button onClick={() => changeStatus(v.id, 'approved')} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold text-xs uppercase px-4 py-3 rounded-xl border border-emerald-200 transition">Approve</button>
-                          <button onClick={() => changeStatus(v.id, 'rejected')} className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs uppercase px-4 py-3 rounded-xl border border-rose-200 transition">Reject</button>
+                          <button onClick={() => changeStatus(v.id, 'approved')} className="bg-emerald-50 text-emerald-600 font-bold text-[10px] uppercase tracking-widest px-4 py-3 rounded-xl border border-emerald-200 hover:bg-emerald-500 hover:text-white transition">Approve</button>
+                          <button onClick={() => changeStatus(v.id, 'rejected')} className="bg-rose-50 text-rose-600 font-bold text-[10px] uppercase tracking-widest px-4 py-3 rounded-xl border border-rose-200">Reject</button>
                         </>
-                      )}
-                      {v.status !== 'pending' && (
-                         <div className="text-xs font-bold text-gray-300 uppercase tracking-widest bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">Closed File</div>
+                      ) : (
+                        <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">Closed</div>
                       )}
                     </div>
-
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

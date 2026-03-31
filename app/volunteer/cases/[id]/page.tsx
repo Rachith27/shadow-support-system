@@ -10,8 +10,10 @@ import {
   XSquare, 
   Info,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Zap
 } from 'lucide-react';
+import VolunteerChat from '@/components/volunteer/VolunteerChat';
 
 export default function InterventionGuide() {
   const { id } = useParams();
@@ -123,6 +125,81 @@ export default function InterventionGuide() {
              </div>
            </div>
 
+             {/* Live Chat Session Context (If available) */}
+             {caseData.sessionContext && (
+                <div className="bg-emerald-900 text-white rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden ring-4 ring-emerald-500/20">
+                   <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+                   <div className="flex items-center gap-2 mb-6">
+                      <Clock size={18} className="text-emerald-300" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-emerald-300">Live Session Profile</h3>
+                   </div>
+                   
+                   <div className="space-y-6">
+                      <div>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Student Identity</p>
+                         <p className="text-lg font-black">{caseData.sessionContext.user_name || 'Anonymous'}</p>
+                         <div className="flex flex-wrap gap-2 mt-2">
+                            <span className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold">{caseData.sessionContext.age_group || 'Age Unknown'}</span>
+                         </div>
+                      </div>
+
+                      {caseData.sessionContext.phone && (
+                         <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">Contact Number</p>
+                            <p className="text-sm font-bold text-emerald-100">{caseData.sessionContext.phone}</p>
+                         </div>
+                      )}
+
+                      <div className="pt-4 border-t border-white/10">
+                         <div className="bg-white/10 p-4 rounded-2xl border border-white/20">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-2 flex items-center gap-2">
+                               <ShieldCheck size={12}/> Human Protocol
+                            </p>
+                            <p className="text-[11px] font-bold leading-relaxed text-white italic">
+                               "Coordinate support via the Safe Chat interface first. Attempt to resolve or de-escalate through text before placing a voice call."
+                            </p>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             )}
+
+            {/* NGO Observatory Context (If available) */}
+            {caseData.reportContext && (
+               <div className="bg-indigo-900 text-white rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden ring-4 ring-indigo-500/20">
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+                  <div className="flex items-center gap-2 mb-6">
+                     <ShieldCheck size={18} className="text-indigo-300" />
+                     <h3 className="text-xs font-black uppercase tracking-widest text-indigo-300">Staff Observation File</h3>
+                  </div>
+                  
+                  <div className="space-y-6">
+                     <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">Student Identity</p>
+                        <p className="text-lg font-black">{caseData.reportContext.student_name || 'Anonymous'}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                           <span className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold">{caseData.reportContext.student_age ? `${caseData.reportContext.student_age} yrs` : 'Age Unknown'}</span>
+                           <span className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold">at {caseData.reportContext.school_name || 'Unknown School'}</span>
+                        </div>
+                     </div>
+
+                     {caseData.reportContext.student_phone && (
+                        <div>
+                           <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">Contact Details</p>
+                           <p className="text-sm font-bold text-indigo-100">{caseData.reportContext.student_phone}</p>
+                        </div>
+                     )}
+
+                     <div className="pt-4 border-t border-white/10">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Internal Staff Notes</p>
+                        <p className="text-sm italic leading-relaxed text-indigo-100">
+                           "{caseData.reportContext.notes || 'No specific notes provided.'}"
+                        </p>
+                     </div>
+                  </div>
+               </div>
+            )}
+
            <div className="bg-emerald-900 text-white rounded-[2.5rem] p-8 shadow-xl">
               <h3 className="text-xs font-black uppercase tracking-widest text-emerald-300 mb-4">Action Control</h3>
               <div className="space-y-3">
@@ -147,8 +224,22 @@ export default function InterventionGuide() {
            </div>
         </div>
 
-        {/* Right Column: AI Guidance */}
+        {/* Right Column: AI Guidance & Live Chat */}
         <div className="md:col-span-2 space-y-8">
+           
+           {/* Section: Live Chat Hand-off */}
+           {caseData.session_id && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                 <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner"><Zap size={18}/></div>
+                    <h2 className="text-xl font-black text-gray-800 tracking-tight">Live Human Intervention</h2>
+                 </div>
+                 <VolunteerChat 
+                    sessionId={caseData.session_id} 
+                    volunteerName="SafeSpace Counselor" 
+                 />
+              </div>
+           )}
            
            {/* Section: Approach */}
            <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-gray-100 relative overflow-hidden">
