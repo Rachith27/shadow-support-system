@@ -20,10 +20,10 @@ const app = express();
 
 // Lenient CORS for debugging
 const corsOptions = {
-  origin: true, 
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: "*",
+  credentials: false,
+  methods: "*",
+  allowedHeaders: "*"
 };
 
 app.use(cors(corsOptions));
@@ -31,8 +31,8 @@ app.use(express.json());
 
 // Root route for simple confirmation
 app.get('/', (req, res) => {
-  res.json({ 
-    message: "🚀 SSS Backend is ACTIVE!", 
+  res.json({
+    message: "🚀 SSS Backend is ACTIVE!",
     time: new Date().toISOString(),
     cors: "Lenient Mode ON"
   });
@@ -48,19 +48,19 @@ app.get('/api/debug/cors', (req, res) => {
 
 // Fetch session history for volunteer context
 app.get('/api/session/:sessionId', async (req, res) => {
-    try {
-        const { sessionId } = req.params;
-        const { data, error } = await supabaseAdmin
-            .from('sessions')
-            .select('*')
-            .eq('session_id', sessionId)
-            .single();
+  try {
+    const { sessionId } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from('sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
 
-        if (error || !data) return res.status(404).json({ error: 'Session not found' });
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
+    if (error || !data) return res.status(404).json({ error: 'Session not found' });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 const server = http.createServer(app);
