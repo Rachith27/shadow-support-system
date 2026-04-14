@@ -32,7 +32,7 @@ export default function VolunteerChat({ sessionId, volunteerName }: VolunteerCha
 
     // 1. Join the room
     socket.emit('join_session', { sessionId, volunteerName });
-    setIsJoined(true);
+    setTimeout(() => setIsJoined(true), 0);
 
     // 2. Listen for messages
     socket.on('user_message_broadcast', (data: { text: string; timestamp: number }) => {
@@ -70,7 +70,7 @@ export default function VolunteerChat({ sessionId, volunteerName }: VolunteerCha
             const res = await fetch(`${API_BASE}/session/${sessionId}`);
             if (res.ok) {
                 const data = await res.json();
-                const formatted = (data.messages || []).map((m: any, i: number) => ({
+                const formatted = (data.messages || []).map((m: Record<string, unknown>, i: number) => ({
                     id: `hist-${i}`,
                     role: m.role || 'user',
                     text: m.content || m.text,

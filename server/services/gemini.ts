@@ -35,8 +35,8 @@ export async function getChatResponse(messageHistory: { role: string; content: s
         
         console.log("Gemini response received!");
         return response.text();
-    } catch (err: any) {
-        console.error("Gemini Chat Error:", err.message);
+    } catch (err: unknown) {
+        console.error("Gemini Chat Error:", err instanceof Error ? err.message : String(err));
         return "I'm here to listen. Can you tell me more about how you're feeling?";
     }
 }
@@ -75,8 +75,8 @@ export async function analyzeWellbeing(userText: string) {
             throw jsonErr;
         }
 
-    } catch (err: any) {
-        console.error("Gemini Analysis Error:", err.message);
+    } catch (err: unknown) {
+        console.error("Gemini Analysis Error:", err instanceof Error ? err.message : String(err));
         // Fallback guaranteed structured response
         return {
             emotion: "unknown",

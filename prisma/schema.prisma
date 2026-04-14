@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  full_name  String?
+  age_group  String?
+  created_at DateTime @default(now())
+  sessions   Session[]
+}
+
+model Volunteer {
+  id              String   @id @default(uuid())
+  full_name       String
+  email           String   @unique
+  phone           String?
+  location        String?
+  skills          String[]
+  availability    String?
+  motivation      String?
+  password        String
+  status          String   @default("pending")
+  assigned_cases  String[]
+  created_at      DateTime @default(now())
+}
+
+model BehaviorReport {
+  id               String        @id @default(uuid())
+  reporter_type    String?
+  student_name     String?
+  school_name      String?
+  student_phone    String?
+  student_age      Int?
+  age_group        String?
+  mood             String?
+  behavior_changes String[]
+  social_flags     String[]
+  academic_flags   String[]
+  notes            String?
+  timestamp        DateTime      @default(now())
+  flagged_cases    FlaggedCase[]
+}
+
+model Event {
+  id                    String              @id @default(uuid())
+  title                 String
+  description           String?
+  topic_category        String?
+  target_issue          String?
+  date                  DateTime?
+  location              String?
+  registration_required Boolean             @default(false)
+  interested_count      Int                 @default(0)
+  created_at            DateTime            @default(now())
+  registrations         EventRegistration[]
+}
+
+model FlaggedCase {
+  id                    String          @id @default(uuid())
+  report_id             String?
+  session_id            String?
+  age_group             String?
+  risk_level            String?
+  detected_concern      String?
+  intervention_status   String          @default("pending")
+  ai_summary            String?
+  guidance              Json?
+  created_at            DateTime        @default(now())
+  behavior_report       BehaviorReport? @relation(fields: [report_id], references: [id])
+}
+
+model Session {
+  id                   String    @id @default(uuid())
+  session_id           String    @unique
+  user_id              String?
+  user_name            String?
+  chat_type            String    @default("anonymous")
+  title                String?
+  age_group            String?
+  age_group_segment    String?
+  phone                String?
+  messages             Json      @default("[]")
+  analysis             Json?
+  target_issue         String?
+  is_human_moderated   Boolean   @default(false)
+  is_completed         Boolean   @default(false)
+  exercise_completions Json      @default("[]")
+  risk_score           Float?
+  risk_tier            String?
+  ai_summary           String?
+  topic_category       String?
+  last_active          DateTime?
+  created_at           DateTime  @default(now())
+  user                 User?     @relation(fields: [user_id], references: [id])
+  events               SessionEvent[]
+}
+
+model SessionEvent {
+  id              String   @id @default(uuid())
+  session_id      String
+  event_type      String
+  sentiment_score Float?
+  mood_emoji      Int?
+  slider_value    Float?
+  created_at      DateTime @default(now())
+  session         Session  @relation(fields: [session_id], references: [session_id])
+}
+
+model EventRegistration {
+  id               String   @id @default(uuid())
+  event_id         String
+  session_id       String?
+  contact_provided Boolean  @default(false)
+  contact_info     String?
+  status           String   @default("interested")
+  registered_at    DateTime @default(now())
+  event            Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+}
+
+model Admin {
+  id       String @id @default(uuid())
+  email    String @unique
+  password String
+}

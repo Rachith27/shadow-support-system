@@ -1,13 +1,8 @@
 import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '../../lib/prisma';
 import { generateSessionInsight } from '../services/ai_insight';
 
 const router = Router();
-
-const supabaseServer = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // POST /api/session/create
 router.post('/create', async (req, res) => {
@@ -20,24 +15,25 @@ router.post('/create', async (req, res) => {
 
     const title = chatType === 'safe' ? `Session ${new Date().toLocaleDateString()}` : undefined;
 
-    const { data, error } = await supabaseServer
-      .from('sessions')
-      .insert({ 
-        session_id: sessionId,
-        user_name: userName || null, 
-        age_group: ageGroup || null, 
-        age_group_segment: ageGroup || null, 
-        phone: phone || null,
-        user_id: userId || null,
-        chat_type: chatType || 'anonymous',
-        title: title
-      })
-      .select()
-      .single();
-
-    if (error) {
+    let data;
+    try {
+        data = await prisma.session.create({
+            data: {
+                session_id: sessionId,
+                user_name: userName || null, 
+                age_group: ageGroup || null, 
+                age_group_segment: ageGroup || null, 
+                phone: phone || null,
+                user_id: userId || null,
+                chat_type: chatType || 'anonymous',
+                title: title
+            }
+        });
+    } catch (error: unknown) {
       console.error('Session create error:', error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ 
+          error: error instanceof Error ? error.message : String(error) 
+      });
     }
 
     return res.status(201).json({ session: data });
@@ -51,16 +47,15 @@ router.post('/create', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { data, error } = await supabaseServer
-      .from('sessions')
-      .select('id, session_id, chat_type, title, created_at')
-      .eq('user_id', userId)
-      .eq('chat_type', 'safe')
-      .order('created_at', { ascending: false });
+    const data = await prisma.session.findMany({
+        where: { user_id: userId, chat_type: 'safe' },
+        select: { id: true, session_id: true, chat_type: true, title: true, created_at: true },
+        orderBy: { created_at: 'desc' }
+    });
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(500).json({ error: 'Failed to fetch' });
     return res.json({ sessions: data });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -71,39 +66,38 @@ router.post('/:id/end', async (req, res) => {
     const { id } = req.params;
 
     // 1. Fetch the full session history
-    const { data: session, error: fetchError } = await supabaseServer
-      .from('sessions')
-      .select('*')
-      .eq('session_id', id)
-      .single();
+    const session = await prisma.session.findUnique({
+        where: { session_id: id }
+    });
 
-    if (fetchError || !session) {
+    if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
     // 2. Generate AI Insights
-    const insight = await generateSessionInsight(session.messages || [], session.age_group);
+    const insight = await generateSessionInsight(Array.isArray(session.messages) ? (session.messages as Record<string, unknown>[]) : [], session.age_group || "");
 
     // 3. Update the session with insights and mark as completed
-    const { error: updateError } = await supabaseServer
-      .from('sessions')
-      .update({
-        is_completed: true,
-        ai_summary: insight.summary,
-        topic_category: insight.topicCategory,
-        // We can also update general analysis if needed
-        analysis: {
-           ...session.analysis,
-           riskLevel: insight.riskLevel,
-           mainTopic: insight.topicCategory
-        },
-        last_active: new Date().toISOString()
-      })
-      .eq('session_id', id);
-
-    if (updateError) {
-      console.error('Session end update error:', updateError);
-      return res.status(500).json({ error: updateError.message });
+    try {
+        await prisma.session.update({
+            where: { session_id: id },
+            data: {
+                is_completed: true,
+                ai_summary: insight.summary,
+                topic_category: insight.topicCategory,
+                analysis: {
+                    ...(session.analysis as Record<string, unknown> || {}),
+                    riskLevel: insight.riskLevel,
+                    mainTopic: insight.topicCategory
+                },
+                last_active: new Date()
+            }
+        });
+    } catch (updateError: unknown) {
+        console.error('Session end update error:', updateError);
+        return res.status(500).json({ 
+            error: updateError instanceof Error ? updateError.message : String(updateError)
+        });
     }
 
     return res.json({ success: true, insight });
@@ -117,16 +111,9 @@ router.post('/:id/end', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabaseServer
-      .from('sessions')
-      .select('*')
-      .eq('session_id', id)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Session fetch error:', error);
-      return res.status(500).json({ error: error.message });
-    }
+    const data = await prisma.session.findUnique({
+        where: { session_id: id }
+    });
 
     if (!data) {
       return res.status(404).json({ error: 'Session not found' });

@@ -7,7 +7,7 @@ import EventCard from '@/components/EventCard';
 import { API_BASE } from '@/lib/api';
 
 function EventsContent() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<Record<string, unknown>[]>([]);
   const [registered, setRegistered] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const searchParams = useSearchParams();

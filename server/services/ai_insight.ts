@@ -7,7 +7,7 @@ export interface AIInsight {
   ageSegment: string;
 }
 
-export async function generateSessionInsight(messages: any[], ageGroupRaw: string): Promise<AIInsight> {
+export async function generateSessionInsight(messages: Record<string, unknown>[], ageGroupRaw: string): Promise<AIInsight> {
   const apiKey = process.env.GROK_AI_API || process.env.GROQ_API_KEY;
   
   if (!apiKey) {
@@ -21,7 +21,7 @@ export async function generateSessionInsight(messages: any[], ageGroupRaw: strin
   }
 
   // Segment Age Group
-  let ageSegment = ageGroupRaw || "Unknown";
+  const ageSegment = ageGroupRaw || "Unknown";
   // The UI sends "13-15", "16-18", "18-21", "21+"
 
   const conversationText = messages
@@ -59,8 +59,9 @@ export async function generateSessionInsight(messages: any[], ageGroupRaw: strin
       }),
     });
 
-    const data: any = await response.json();
-    const result = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    const data = await response.json() as Record<string, unknown>;
+    const choices = data.choices as Array<{ message: { content: string } }>;
+    const result = JSON.parse(choices?.[0]?.message?.content || "{}");
 
     return {
       summary: result.summary || "Summary generation failed.",

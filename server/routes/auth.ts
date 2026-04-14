@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { supabaseAdmin } from '../../lib/supabase';
+import { prisma } from '../../lib/prisma';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'sss-shadow-support-secret-2026';
@@ -16,17 +16,14 @@ router.post('/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const { data, error } = await supabaseAdmin
-            .from('users')
-            .insert([{ email, password: hashedPassword, full_name, age_group }])
-            .select()
-            .single();
-
-        if (error) {
-            if (error.code === '23505') {
+        let data;
+        try {
+            data = await prisma.user.create({ data: { email, password: hashedPassword, full_name, age_group } });
+        } catch (err: unknown) {
+            if (err && typeof err === 'object' && 'code' in err && (err as Record<string, unknown>).code === 'P2002') {
                  return res.status(400).json({ error: 'Email already exists' });
             }
-            throw error;
+            throw err;
         }
 
         const token = jwt.sign({ id: data.id, role: 'user' }, JWT_SECRET, { expiresIn: '7d' });
@@ -42,13 +39,9 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         
-        const { data: user, error } = await supabaseAdmin
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
+        const user = await prisma.user.findUnique({ where: { email } });
 
-        if (error || !user) {
+        if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -75,15 +68,14 @@ router.get('/me', async (req, res) => {
          const payload = jwt.verify(token, JWT_SECRET) as { id: string, role: string };
          if (payload.role !== 'user') return res.status(403).json({ error: 'Not authorized' });
 
-         const { data: user, error } = await supabaseAdmin
-             .from('users')
-             .select('id, email, full_name, age_group, created_at')
-             .eq('id', payload.id)
-             .single();
+         const user = await prisma.user.findUnique({ 
+             where: { id: payload.id },
+             select: { id: true, email: true, full_name: true, age_group: true, created_at: true }
+         });
          
-         if (error || !user) return res.status(404).json({ error: 'User not found' });
+         if (!user) return res.status(404).json({ error: 'User not found' });
          res.json({ user });
-     } catch (err) {
+     } catch {
          res.status(401).json({ error: 'Invalid token' });
      }
 });

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { supabaseAdmin } from '../../lib/supabase';
+import { prisma } from '../../lib/prisma';
 import { getChatResponse, analyzeWellbeing } from '../services/gemini';
 
 const router = Router();
@@ -11,12 +11,10 @@ router.post('/session/start', async (req, res) => {
     const sessionId = uuidv4();
     const { ageGroup } = req.body || {};
 
-    const { error } = await supabaseAdmin
-      .from('sessions')
-      .insert({ session_id: sessionId, age_group: ageGroup, messages: [] });
-
-    if (error) {
-        console.error("Supabase Session Error:", error);
+    try {
+        await prisma.session.create({ data: { session_id: sessionId, age_group: ageGroup, messages: [] } });
+    } catch (error) {
+        console.error("Prisma Session Error:", error);
         return res.status(500).json({ error: 'Failed to start session.' });
     }
 
@@ -38,17 +36,13 @@ router.post('/chat', async (req, res) => {
     }
 
     // 1. Fetch Session History
-    const { data: session, error: fetchError } = await supabaseAdmin
-      .from('sessions')
-      .select('*')
-      .eq('session_id', sessionId)
-      .single();
+    const session = await prisma.session.findUnique({ where: { session_id: sessionId } });
 
-    if (fetchError || !session) {
+    if (!session) {
         return res.status(404).json({ error: 'Session not found' });
     }
 
-    const messages = session.messages || [];
+    const messages = Array.isArray(session.messages) ? (session.messages as Array<{role: string; content: string; timestamp?: string}>) : [];
     messages.push({ role: 'user', content: userText, timestamp: new Date().toISOString() });
 
     // 2. Risk Assessment (Original Logic)
@@ -70,7 +64,7 @@ router.post('/chat', async (req, res) => {
       riskLevel = 'medium';
     } else {
       // Call Gemini for general chat
-      replyContent = await getChatResponse(messages);
+      replyContent = await getChatResponse(messages as Array<{ role: string; content: string }>);
     }
 
     // 3. AI Wellbeing Analysis
@@ -89,34 +83,36 @@ router.post('/chat', async (req, res) => {
     // 4. Save AI Reply and Analysis
     messages.push({ role: 'ai', content: replyContent, timestamp: new Date().toISOString() });
     
-    const { error: updateError } = await supabaseAdmin
-      .from('sessions')
-      .update({ 
-          messages, 
-          analysis, 
-          target_issue: targetIssue 
-      })
-      .eq('session_id', sessionId);
-
-    if (updateError) {
-        console.error("Supabase Save Error:", updateError);
+    try {
+        await prisma.session.update({
+            where: { session_id: sessionId },
+            data: { 
+                messages, 
+                analysis: analysis ? JSON.parse(JSON.stringify(analysis)) : undefined, 
+                target_issue: targetIssue 
+            }
+        });
+    } catch (updateError) {
+        console.error("Prisma Save Error:", updateError);
     }
 
     // 5. If High Risk, create a Flagged Case
     if (riskLevel === 'high') {
-        await supabaseAdmin.from('flagged_cases').insert({
-            age_group: session.age_group,
-            risk_level: 'high',
-            detected_concern: "Self-Harm/Suicidal Ideation detected in chat.",
-            ai_summary: `Student expressed high-risk sentiment: "${userText}"`,
-            intervention_status: 'pending'
+        await prisma.flaggedCase.create({
+            data: {
+                age_group: session.age_group,
+                risk_level: 'high',
+                detected_concern: "Self-Harm/Suicidal Ideation detected in chat.",
+                ai_summary: `Student expressed high-risk sentiment: "${userText}"`,
+                intervention_status: 'pending'
+            }
         });
     }
 
     res.json({ reply: replyContent, riskLevel });
 
-  } catch (err) {
-    console.error("Chat Route Error:", err);
+  } catch {
+    console.error("Chat Route Error: Fatal Chat Server Error");
     res.status(500).json({ error: 'Fatal Chat Server Error' });
   }
 });
@@ -124,20 +120,19 @@ router.post('/chat', async (req, res) => {
 // GET /api/session/:id/summary
 router.get('/session/:id/summary', async (req, res) => {
   try {
-    const { data: session, error } = await supabaseAdmin
-      .from('sessions')
-      .select('analysis, target_issue')
-      .eq('session_id', req.params.id)
-      .single();
+    const session = await prisma.session.findUnique({
+        where: { session_id: req.params.id },
+        select: { analysis: true, target_issue: true }
+    });
 
-    if (error || !session) return res.status(404).json({ error: 'Session not found' });
+    if (!session) return res.status(404).json({ error: 'Session not found' });
     
     res.json({ 
         summary: session.analysis || { emotion: "unknown", situation: "Data missing" }, 
         targetIssue: session.target_issue || 'general_support',
         disclaimer: "This is an AI generated observation, not a clinical diagnosis."
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Error fetching session' });
   }
 });

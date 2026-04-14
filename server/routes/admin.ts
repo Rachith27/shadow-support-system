@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthRequest, adminOnly } from '../middleware/auth';
-import { supabaseAdmin } from '../../lib/supabase';
+import { prisma } from '../../lib/prisma';
 
 const router = Router();
 
@@ -19,15 +19,12 @@ router.post('/login', async (req, res) => {
         return res.json({ success: true, token, admin: { email: envEmail } });
     }
 
-    // Otherwise check Supabase
-    const { data: admin, error } = await supabaseAdmin
-        .from('admins')
-        .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
+    // Otherwise check Prisma
+    const admin = await prisma.admin.findFirst({
+        where: { email, password }
+    });
 
-    if (error || !admin) return res.status(401).json({ error: 'Invalid admin credentials' });
+    if (!admin) return res.status(401).json({ error: 'Invalid admin credentials' });
     
     const token = jwt.sign({ id: admin.id, role: 'admin' }, process.env.JWT_SECRET || 'secret', { expiresIn: '8h' });
     res.json({ success: true, token, admin });
@@ -41,63 +38,67 @@ router.post('/login', async (req, res) => {
 // GET /api/admin/dashboard (Protected)
 router.get('/dashboard', adminOnly, async (req: AuthRequest, res: Response) => {
   try {
-    const { count: totalSessions } = await supabaseAdmin.from('sessions').select('*', { count: 'exact', head: true });
-    const { count: totalBehaviorReports } = await supabaseAdmin.from('behavior_reports').select('*', { count: 'exact', head: true });
-    const { count: flaggedCasesCounts } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true });
+    const totalSessions = await prisma.session.count();
+    const totalBehaviorReports = await prisma.behaviorReport.count();
+    const flaggedCasesCounts = await prisma.flaggedCase.count();
     
     // Risk Levels for Flagged Cases
-    const { count: high } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'high');
-    const { count: medium } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'medium');
-    const { count: low } = await supabaseAdmin.from('flagged_cases').select('*', { count: 'exact', head: true }).eq('risk_level', 'low');
+    const high = await prisma.flaggedCase.count({ where: { risk_level: 'high' } });
+    const medium = await prisma.flaggedCase.count({ where: { risk_level: 'medium' } });
+    const low = await prisma.flaggedCase.count({ where: { risk_level: 'low' } });
 
     // Topic Aggregation (from completed sessions)
-    const { data: topicsData } = await supabaseAdmin
-      .from('sessions')
-      .select('topic_category')
-      .not('topic_category', 'is', null);
+    const topicsData = await prisma.session.findMany({
+      where: { topic_category: { not: null } },
+      select: { topic_category: true }
+    });
     
     const topicCounts: Record<string, number> = {};
     topicsData?.forEach(s => {
-      topicCounts[s.topic_category] = (topicCounts[s.topic_category] || 0) + 1;
+      if (s.topic_category) {
+        topicCounts[s.topic_category] = (topicCounts[s.topic_category] || 0) + 1;
+      }
     });
 
     // Age Group Aggregation
-    const { data: ageData } = await supabaseAdmin
-      .from('sessions')
-      .select('age_group_segment')
-      .not('age_group_segment', 'is', null);
+    const ageData = await prisma.session.findMany({
+      where: { age_group_segment: { not: null } },
+      select: { age_group_segment: true }
+    });
     
     const ageCounts: Record<string, number> = {};
     ageData?.forEach(s => {
-      ageCounts[s.age_group_segment] = (ageCounts[s.age_group_segment] || 0) + 1;
+      if (s.age_group_segment) {
+        ageCounts[s.age_group_segment] = (ageCounts[s.age_group_segment] || 0) + 1;
+      }
     });
 
     // Detailed Session Insights
-    const { data: recentSessions } = await supabaseAdmin
-      .from('sessions')
-      .select('id, session_id, age_group_segment, topic_category, ai_summary, created_at, chat_type')
-      .eq('is_completed', true)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const recentSessions = await prisma.session.findMany({
+      where: { is_completed: true },
+      select: { id: true, session_id: true, age_group_segment: true, topic_category: true, ai_summary: true, created_at: true, chat_type: true },
+      orderBy: { created_at: 'desc' },
+      take: 10
+    });
 
-    const { data: volunteers } = await supabaseAdmin.from('volunteers').select('*').order('created_at', { ascending: false });
+    const volunteers = await prisma.volunteer.findMany({ orderBy: { created_at: 'desc' } });
     
     // Behavior Reports Log
-    const { data: behaviorReports } = await supabaseAdmin
-      .from('behavior_reports')
-      .select('*')
-      .order('timestamp', { ascending: false });
+    const behaviorReports = await prisma.behaviorReport.findMany({
+      orderBy: { timestamp: 'desc' }
+    });
 
     // Exercise Adherence (Medium/High Risk Users)
-    const { data: medHighSessions, error: adherenceError } = await supabaseAdmin
-      .from('sessions')
-      .select('exercise_completions')
-      .in('risk_tier', ['medium', 'high']);
+    const medHighSessions = await prisma.session.findMany({
+      where: { risk_tier: { in: ['medium', 'high'] } },
+      select: { exercise_completions: true }
+    });
     
     let adherenceCount = 0;
     const totalMedHigh = medHighSessions?.length || 0;
     medHighSessions?.forEach(s => {
-       if (Array.isArray(s.exercise_completions) && s.exercise_completions.length > 0) {
+       const completions = s.exercise_completions as unknown[];
+       if (Array.isArray(completions) && completions.length > 0) {
           adherenceCount++;
        }
     });
@@ -128,17 +129,15 @@ router.patch('/volunteers/:id/status', adminOnly, async (req: AuthRequest, res: 
     if (!['pending', 'approved', 'rejected'].includes(status)) {
         return res.status(400).json({ error: "Invalid status definition" });
     }
-    
-    const { data: vol, error } = await supabaseAdmin
-        .from('volunteers')
-        .update({ status })
-        .eq('id', req.params.id)
-        .select()
-        .single();
-
-    if (error || !vol) return res.status(404).json({ error: "Volunteer not found" });
-
-    res.json({ success: true, volunteer: vol });
+    try {
+        const vol = await prisma.volunteer.update({
+            where: { id: req.params.id as string },
+            data: { status }
+        });
+        res.json({ success: true, volunteer: vol });
+    } catch {
+        return res.status(404).json({ error: "Volunteer not found" });
+    }
   } catch(err) {
     console.error("Volunteer Update Error:", err);
     res.status(500).json({ error: 'Update failed safely' });

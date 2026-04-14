@@ -75,7 +75,7 @@ export default function GroundingExercise({ onComplete }: { onComplete: (moodSco
            <h4 className="text-xl font-black text-slate-800 tracking-tight pb-1">{step.label}</h4>
         </div>
         <p className="text-slate-600 font-medium text-center text-lg leading-relaxed max-w-sm px-4 italic opacity-80">
-          "{step.prompt}"
+          &quot;{step.prompt}&quot;
         </p>
       </div>
 

@@ -8,7 +8,7 @@ import { API_BASE } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 
 export default function VolunteerCases() {
-  const [cases, setCases] = useState<any[]>([]);
+  const [cases, setCases] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
@@ -54,7 +54,7 @@ export default function VolunteerCases() {
 
     const socket = getSocket();
     
-    socket.on('new_intervention_needed', (data: any) => {
+    socket.on('new_intervention_needed', (data: Record<string, unknown>) => {
        console.log('🚨 Background refresh triggered by new case:', data);
        
        // Auto-fetch new data to show at top

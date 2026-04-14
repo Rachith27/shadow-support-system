@@ -42,8 +42,21 @@ interface DashboardData {
   ageInsights: Record<string, number>;
   recentInsights: InsightSession[];
   volunteers: Volunteer[];
-  behaviorReports: any[];
+  behaviorReports: Record<string, unknown>[];
   exerciseAdherence: number;
+}
+
+interface DashboardResponse {
+  totalSessions?: number;
+  totalBehaviorReports?: number;
+  flaggedCasesCounts?: number;
+  riskLevels?: { high: number; medium: number; low: number };
+  topicInsights?: Record<string, number>;
+  ageInsights?: Record<string, number>;
+  recentInsights?: InsightSession[];
+  volunteers?: { id: string; fullName?: string; full_name?: string; email: string; status: string; location?: string; phone?: string; motivation?: string; skills?: string[] }[];
+  behaviorReports?: Record<string, unknown>[];
+  exerciseAdherence?: number;
 }
 
 export default function AdminDashboard() {
@@ -75,7 +88,7 @@ export default function AdminDashboard() {
         }
         return r.json();
       })
-      .then((d: any) => {
+      .then((d: DashboardResponse) => {
         if (!d) return;
         setData({
           ...d,
@@ -83,14 +96,14 @@ export default function AdminDashboard() {
           topicInsights: d.topicInsights || {},
           ageInsights: d.ageInsights || {},
           recentInsights: d.recentInsights || [],
-          volunteers: (d.volunteers || []).map((v: any) => ({
+          volunteers: (d.volunteers || []).map((v) => ({
               id: v.id,
-              fullName: v.full_name || v.fullName,
+              fullName: v.full_name || v.fullName || '',
               email: v.email,
               status: v.status,
-              location: v.location,
-              phone: v.phone,
-              motivation: v.motivation,
+              location: v.location || '',
+              phone: v.phone || '',
+              motivation: v.motivation || '',
               skills: v.skills || []
           })),
           behaviorReports: d.behaviorReports || [],
@@ -135,11 +148,14 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    setMounted(true);
-    if (typeof window !== 'undefined' && localStorage.getItem('adminToken')) {
-        setIsLoggedIn(true);
-        fetchData();
-    }
+    const timer = setTimeout(() => {
+      setMounted(true);
+      if (typeof window !== 'undefined' && localStorage.getItem('adminToken')) {
+          setIsLoggedIn(true);
+          fetchData();
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!mounted) return <div className="min-h-screen bg-gray-900" />;
@@ -221,7 +237,7 @@ export default function AdminDashboard() {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'summary' | 'insights' | 'volunteers' | 'reports')}
               className={`px-6 py-3 rounded-[1.5rem] font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2
                 ${activeTab === tab.id ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600 hover:bg-white'}`}
             >
@@ -339,7 +355,7 @@ export default function AdminDashboard() {
                              {new Date(s.created_at).toLocaleDateString()} at {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                        </div>
-                       <p className="text-gray-700 leading-relaxed font-medium italic">"{s.ai_summary}"</p>
+                       <p className="text-gray-700 leading-relaxed font-medium italic">&quot;{s.ai_summary}&quot;</p>
                     </div>
                   ))}
                </div>
@@ -429,7 +445,7 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-400 mt-1">{v.location}</p>
                     </div>
                     <div className="col-span-3 text-sm">
-                      <p className="text-gray-600 line-clamp-2 italic text-xs">"{v.motivation}"</p>
+                      <p className="text-gray-600 line-clamp-2 italic text-xs">&quot;{v.motivation}&quot;</p>
                     </div>
                     <div className="col-span-3 flex justify-end gap-2">
                       {v.status === 'pending' ? (

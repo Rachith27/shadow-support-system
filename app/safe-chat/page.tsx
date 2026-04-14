@@ -29,7 +29,7 @@ export default function SafeChatHub() {
       return;
     }
 
-    if (name) setUserName(name);
+    if (name) setTimeout(() => setUserName(name), 0);
 
     fetch(`${API_BASE}/session/user/${userId}`, {
       headers: { Authorization: `Bearer ${token}` }

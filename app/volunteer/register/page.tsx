@@ -43,7 +43,7 @@ export default function VolunteerRegister() {
         <div className="bg-white/80 backdrop-blur-xl p-12 rounded-[3rem] shadow-2xl max-w-2xl border border-white">
           <UserPlus size={80} className="text-emerald-500 bg-emerald-50 p-5 rounded-full shadow-inner mx-auto mb-8" />
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4 text-gray-900 tracking-tight">Application Submitted</h2>
-          <p className="text-gray-600 text-lg mb-10 leading-relaxed font-medium">Your registration is 'Pending'. NGO moderation team must approve your profile before you gain access to the dashboard.</p>
+          <p className="text-gray-600 text-lg mb-10 leading-relaxed font-medium">Your registration is &apos;Pending&apos;. NGO moderation team must approve your profile before you gain access to the dashboard.</p>
           <button onClick={() => router.push('/')} className="w-full bg-emerald-600 text-white rounded-full py-5 text-xl font-bold shadow-xl hover:-translate-y-1 transition active:scale-[0.98]">Return to Home</button>
         </div>
      </div>

@@ -37,7 +37,7 @@ export default function BoxBreathing({ onComplete }: { onComplete: (moodScore: n
 
   useEffect(() => {
     if (rounds === MAX_ROUNDS) {
-      setIsActive(false);
+      setTimeout(() => setIsActive(false), 0);
     }
   }, [rounds]);
 

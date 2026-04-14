@@ -48,8 +48,8 @@ export default function VolunteerLogin() {
             localStorage.setItem("volunteerUser", JSON.stringify(data.volunteer || {}));
 
             router.push("/volunteer/dashboard");
-        } catch (err: any) {
-            setError(err.message || "Something went wrong");
+        } catch (err: unknown) {
+            setError((err as Error).message || "Something went wrong");
         } finally {
             setLoading(false);
         }

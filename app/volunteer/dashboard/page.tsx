@@ -32,8 +32,9 @@ export default function VolunteerDashboard() {
     const savedUser = localStorage.getItem("volunteerUser");
     if (savedUser) {
       try {
-        setVolunteer(JSON.parse(savedUser));
-      } catch (e) {
+        const parsed = JSON.parse(savedUser);
+        setTimeout(() => setVolunteer(parsed), 0);
+      } catch {
         console.error("Failed to parse volunteer data");
       }
     }

@@ -1,12 +1,7 @@
 import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '../../lib/prisma';
 
 const router = Router();
-
-const supabaseServer = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // POST /api/mood/submit
 router.post('/submit', async (req, res) => {
@@ -33,18 +28,20 @@ router.post('/submit', async (req, res) => {
     else riskTier = 'high';
 
     // Update session
-    await supabaseServer
-      .from('sessions')
-      .update({ risk_score: riskScore, risk_tier: riskTier, last_active: new Date().toISOString() })
-      .eq('session_id', sessionId);
+    await prisma.session.update({
+        where: { session_id: sessionId },
+        data: { risk_score: riskScore, risk_tier: riskTier, last_active: new Date() }
+    });
 
     // Insert event
-    await supabaseServer.from('session_events').insert({
-      session_id: sessionId,
-      event_type: 'mood_checkin',
-      sentiment_score: blendedScore,
-      mood_emoji: emojiIndex,
-      slider_value: sliderValue ?? null,
+    await prisma.sessionEvent.create({
+      data: {
+        session_id: sessionId,
+        event_type: 'mood_checkin',
+        sentiment_score: blendedScore,
+        mood_emoji: emojiIndex,
+        slider_value: sliderValue ?? null,
+      }
     });
 
     return res.json({ riskTier, riskScore });

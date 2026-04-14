@@ -1,23 +1,6 @@
 import { Server, Socket } from 'socket.io';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '../../lib/prisma';
 import type { MoodCheckInPayload, UserMessagePayload, VentPayload } from '../../types';
-
-// Server-side Supabase client — bypasses RLS
-let supabaseServer: any;
-
-const getSupabaseServer = () => {
-  if (!supabaseServer) {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Supabase environment variables are missing!');
-      return null;
-    }
-    supabaseServer = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-  }
-  return supabaseServer;
-};
 
 const EMOJI_SCORES = [1.0, 0.75, 0.5, 0.25, 0.0];
 
@@ -42,37 +25,44 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
       else if (riskScore < 0.6) riskTier = 'medium';
       else riskTier = 'high';
 
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
+      await prisma.session.update({
+          where: { session_id: payload.sessionId },
+          data: {
+              risk_score: riskScore, 
+              risk_tier: riskTier,
+              last_active: new Date()
+          }
+      });
 
-      await supabase.from('sessions').update({ 
-        risk_score: riskScore, 
-        risk_tier: riskTier,
-        last_active: new Date().toISOString()
-      }).eq('session_id', payload.sessionId);
-
-      await supabase.from('session_events').insert({ 
-        session_id: payload.sessionId, 
-        event_type: 'mood_checkin', 
-        sentiment_score: blendedScore, 
-        mood_emoji: payload.emojiIndex, 
-        slider_value: payload.sliderValue 
+      await prisma.sessionEvent.create({
+          data: {
+              session_id: payload.sessionId, 
+              event_type: 'mood_checkin', 
+              sentiment_score: blendedScore, 
+              mood_emoji: payload.emojiIndex, 
+              slider_value: payload.sliderValue 
+          }
       });
 
       if (riskTier === 'high') {
-         const { data: sessionInfo } = await supabase.from('sessions').select('age_group, user_name, phone').eq('session_id', payload.sessionId).maybeSingle();
-         await supabase.from('flagged_cases').insert({
-            session_id: payload.sessionId,
-            age_group: sessionInfo?.age_group || 'Unknown',
-            risk_level: 'high',
-            detected_concern: `Live Session Help Request: ${sessionInfo?.user_name || 'Anonymous User'}`,
-            ai_summary: `Student ${sessionInfo?.user_name || payload.sessionId.slice(0, 8)} has flagged as High Risk.`,
-            guidance: { 
-              approach: "Join via Safe Chat. Chat first protocol.", 
-              whatToSay: ["I'm here to support you."], 
-              dos: ["Chat first"], 
-              donts: ["Call immediately"] 
-            }
+         const sessionInfo = await prisma.session.findUnique({
+             where: { session_id: payload.sessionId },
+             select: { age_group: true, user_name: true, phone: true }
+         });
+         await prisma.flaggedCase.create({
+             data: {
+                 session_id: payload.sessionId,
+                 age_group: sessionInfo?.age_group || 'Unknown',
+                 risk_level: 'high',
+                 detected_concern: `Live Session Help Request: ${sessionInfo?.user_name || 'Anonymous User'}`,
+                 ai_summary: `Student ${sessionInfo?.user_name || payload.sessionId.slice(0, 8)} has flagged as High Risk.`,
+                 guidance: { 
+                   approach: "Join via Safe Chat. Chat first protocol.", 
+                   whatToSay: ["I'm here to support you."], 
+                   dos: ["Chat first"], 
+                   donts: ["Call immediately"] 
+                 }
+             }
          });
           
           // Emit global alert to all connected sockets (volunteers)
@@ -91,10 +81,10 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
     socket.join(payload.sessionId);
     console.log(`🙋 Volunteer joined room: ${payload.sessionId}`);
     
-    const supabase = getSupabaseServer();
-    if (supabase) {
-      await supabase.from('sessions').update({ is_human_moderated: true }).eq('session_id', payload.sessionId);
-    }
+    await prisma.session.update({
+        where: { session_id: payload.sessionId },
+        data: { is_human_moderated: true }
+    });
     
     io.to(payload.sessionId).emit('volunteer_joined', { 
       volunteerName: payload.volunteerName || "SafeSpace Counselor" 
@@ -105,25 +95,31 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   socket.on('user_message', async (payload: UserMessagePayload) => {
     socket.join(payload.sessionId);
     try {
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
-
       io.to(payload.sessionId).emit('user_message_broadcast', { 
         text: payload.text, 
         timestamp: Date.now() 
       });
 
-      await supabase.from('session_events').insert({ session_id: payload.sessionId, event_type: 'message' });
+      await prisma.sessionEvent.create({
+          data: { session_id: payload.sessionId, event_type: 'message' }
+      });
 
-      const { data: sessionData } = await supabase.from('sessions').select('messages, is_human_moderated').eq('session_id', payload.sessionId).single();
+      const sessionData = await prisma.session.findUnique({
+          where: { session_id: payload.sessionId },
+          select: { messages: true, is_human_moderated: true }
+      });
+      
       const isModerated = sessionData?.is_human_moderated || false;
-      const history = sessionData?.messages || [];
+      const history = Array.isArray(sessionData?.messages) ? (sessionData.messages as Array<{role: string; content: string; timestamp?: number}>) : [];
       const updatedHistory = [...history, { role: 'user', content: payload.text, timestamp: Date.now() }];
 
-      await supabase.from('sessions').update({ 
-        messages: updatedHistory, 
-        last_active: new Date().toISOString() 
-      }).eq('session_id', payload.sessionId);
+      await prisma.session.update({
+          where: { session_id: payload.sessionId },
+          data: { 
+              messages: updatedHistory, 
+              last_active: new Date() 
+          }
+      });
 
       if (isModerated) {
           console.log(`🤖 AI silenced for session ${payload.sessionId}`);
@@ -138,7 +134,10 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
 
         const groqMessages = [
           { role: 'system', content: 'You are a supportive listener. Keep it under 3 sentences.' },
-          ...updatedHistory.slice(-10).map((m: any) => ({ role: m.role, content: m.content }))
+          ...updatedHistory.slice(-10).map((m: unknown) => {
+              const msg = m as { role: string; content: string };
+              return { role: msg.role, content: msg.content };
+          })
         ];
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -150,8 +149,10 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
         const data = await response.json();
         const reply = data.choices?.[0]?.message?.content || "I hear you.";
         const finalHistory = [...updatedHistory, { role: 'assistant', content: reply.trim(), timestamp: Date.now() }];
-        
-        await supabase.from('sessions').update({ messages: finalHistory }).eq('session_id', payload.sessionId);
+        await prisma.session.update({
+            where: { session_id: payload.sessionId },
+            data: { messages: finalHistory }
+        });
 
         socket.emit('typing_indicator', { active: false });
         io.to(payload.sessionId).emit('system_message', { text: reply.trim() });
@@ -165,18 +166,21 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   // ── VOLUNTEER MESSAGE ──────────────────────────────────────────
   socket.on('volunteer_message', async (payload: { sessionId: string; text: string; volunteerName?: string }) => {
     try {
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
-
-      const { data: sessionData } = await supabase.from('sessions').select('messages').eq('session_id', payload.sessionId).single();
-      const history = sessionData?.messages || [];
+      const sessionData = await prisma.session.findUnique({
+          where: { session_id: payload.sessionId },
+          select: { messages: true }
+      });
+      const history = Array.isArray(sessionData?.messages) ? (sessionData.messages as Array<{role: string; content: string; timestamp?: number; volunteerName?: string}>) : [];
       const newMsg = { role: 'volunteer', content: payload.text, volunteerName: payload.volunteerName, timestamp: Date.now() };
       
-      await supabase.from('sessions').update({ 
-        messages: [...history, newMsg],
-        last_active: new Date().toISOString(),
-        is_human_moderated: true 
-      }).eq('session_id', payload.sessionId);
+      await prisma.session.update({
+          where: { session_id: payload.sessionId },
+          data: { 
+              messages: [...history, newMsg],
+              last_active: new Date(),
+              is_human_moderated: true 
+          }
+      });
 
       io.to(payload.sessionId).emit('volunteer_message_broadcast', {
         text: payload.text,
@@ -189,11 +193,11 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   // ── EXERCISE COMPLETE ──────────────────────────────────────────
   socket.on('exercise_complete', async (payload: { sessionId: string; exerciseType: string; moodScore: number; timestamp: number }) => {
     try {
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
-
-      const { data: sessionData } = await supabase.from('sessions').select('exercise_completions, risk_score').eq('session_id', payload.sessionId).single();
-      const completions = sessionData?.exercise_completions || [];
+      const sessionData = await prisma.session.findUnique({
+          where: { session_id: payload.sessionId },
+          select: { exercise_completions: true, risk_score: true }
+      });
+      const completions = Array.isArray(sessionData?.exercise_completions) ? (sessionData.exercise_completions as Array<{type: string; mood: number; timestamp: number}>) : [];
       const updatedCompletions = [...completions, { type: payload.exerciseType, mood: payload.moodScore, timestamp: payload.timestamp }];
 
       // Potentially lower risk if mood is high (4-5)
@@ -204,17 +208,22 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
       if (newRiskScore >= 0.6) newRiskTier = 'high';
       else if (newRiskScore >= 0.3) newRiskTier = 'medium';
 
-      await supabase.from('sessions').update({ 
-        exercise_completions: updatedCompletions,
-        risk_score: newRiskScore,
-        risk_tier: newRiskTier,
-        last_active: new Date().toISOString()
-      }).eq('session_id', payload.sessionId);
+      await prisma.session.update({
+          where: { session_id: payload.sessionId },
+          data: { 
+              exercise_completions: updatedCompletions,
+              risk_score: newRiskScore,
+              risk_tier: newRiskTier,
+              last_active: new Date()
+          }
+      });
 
-      await supabase.from('session_events').insert({ 
-        session_id: payload.sessionId, 
-        event_type: 'exercise_complete',
-        sentiment_score: payload.moodScore / 5 // Normalized 0-1
+      await prisma.sessionEvent.create({
+          data: {
+              session_id: payload.sessionId, 
+              event_type: 'exercise_complete',
+              sentiment_score: payload.moodScore / 5 // Normalized 0-1
+          }
       });
 
       socket.emit('risk_update', { riskTier: newRiskTier, riskScore: newRiskScore });
@@ -249,25 +258,27 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   socket.on('request_volunteer', async (payload: { sessionId: string }) => {
     socket.join(payload.sessionId);
     try {
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
-
-      const { data: sessionInfo } = await supabase.from('sessions').select('age_group, user_name, chat_type, risk_tier').eq('session_id', payload.sessionId).single();
+      const sessionInfo = await prisma.session.findUnique({
+          where: { session_id: payload.sessionId },
+          select: { age_group: true, user_name: true, chat_type: true, risk_tier: true }
+      });
 
       // Check if any volunteer is available (simulated for MVP)
       // If none, we could emit 'volunteer_unavailable'
       // But for now, we create a flagged case to alert volunteers on the admin/volunteer dashboard.
-      await supabase.from('flagged_cases').insert({
-          session_id: payload.sessionId,
-          age_group: sessionInfo?.age_group || 'Unknown',
-          risk_level: sessionInfo?.risk_tier || 'medium',
-          detected_concern: `User Requested Volunteer: ${sessionInfo?.user_name || 'Safe Chat User'}`,
-          ai_summary: `User explicitly requested to speak to a volunteer.`,
-          guidance: { 
-            approach: "Join via Safe Chat. User requested help.", 
-            whatToSay: ["Hi, I'm here to support you. How can I help?"], 
-            dos: ["Listen to what they need"], 
-            donts: [] 
+      await prisma.flaggedCase.create({
+          data: {
+              session_id: payload.sessionId,
+              age_group: sessionInfo?.age_group || 'Unknown',
+              risk_level: sessionInfo?.risk_tier || 'medium',
+              detected_concern: `User Requested Volunteer: ${sessionInfo?.user_name || 'Safe Chat User'}`,
+              ai_summary: `User explicitly requested to speak to a volunteer.`,
+              guidance: { 
+                approach: "Join via Safe Chat. User requested help.", 
+                whatToSay: ["Hi, I'm here to support you. How can I help?"], 
+                dos: ["Listen to what they need"], 
+                donts: [] 
+              }
           }
       });
       
@@ -286,10 +297,13 @@ export function registerSocketHandlers(io: Server, socket: Socket) {
   socket.on('vent_message', async (payload: VentPayload) => {
     socket.join(payload.sessionId);
     try {
-      const supabase = getSupabaseServer();
-      if (!supabase) return;
-      await supabase.from('session_events').insert({ session_id: payload.sessionId, event_type: 'vent' });
-      await supabase.from('sessions').update({ last_active: new Date().toISOString() }).eq('session_id', payload.sessionId);
+      await prisma.sessionEvent.create({
+          data: { session_id: payload.sessionId, event_type: 'vent' }
+      });
+      await prisma.session.update({
+          where: { session_id: payload.sessionId },
+          data: { last_active: new Date() }
+      });
     } catch (err) { console.error('Vent error:', err); }
   });
 }

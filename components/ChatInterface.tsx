@@ -129,7 +129,7 @@ export default function ChatInterface({
         role: 'assistant', // Render as assistant but maybe add a flag
         text: data.text,
         timestamp: Date.now(),
-        // @ts-ignore
+        // @ts-expect-error adding custom property to interface intentionally
         isVolunteer: true,
         volunteerName: data.volunteerName
       }]);
@@ -323,7 +323,7 @@ export default function ChatInterface({
           <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-gray-100 max-w-md w-full scale-in">
             <h3 className="text-2xl font-black text-brand-navy mb-3">End this session?</h3>
             <p className="text-text-muted font-medium mb-8 leading-relaxed">
-              We'll save your progress anonymously. You won't be able to continue this specific conversation later.
+              We&apos;ll save your progress anonymously. You won&apos;t be able to continue this specific conversation later.
             </p>
             <div className="flex gap-4">
               <button 

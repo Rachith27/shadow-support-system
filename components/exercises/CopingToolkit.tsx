@@ -81,7 +81,7 @@ export default function CopingToolkit({ sessionId, riskTier, isOpen, onClose, la
                 {/* Recommendation Highlight */}
                 {recommended && (
                    <div className={`p-6 rounded-[2.5rem] bg-${recommended.color}-50 border border-${recommended.color}-100 shadow-sm relative group cursor-pointer hover:scale-[1.02] transition-all`}
-                        onClick={() => setActiveExercise(recommended.id as any)}>
+                        onClick={() => setActiveExercise(recommended.id as ExerciseType)}>
                       <div className="bg-white p-2.5 rounded-xl text-emerald-500 text-[10px] font-black uppercase tracking-widest absolute -top-3 left-6 shadow-sm border border-emerald-100 flex items-center gap-1">
                          <Zap size={10} fill="currentColor"/> Recommended for now
                       </div>
@@ -103,7 +103,7 @@ export default function CopingToolkit({ sessionId, riskTier, isOpen, onClose, la
                    {exercises.map((ex) => (
                       <button 
                         key={ex.id}
-                        onClick={() => setActiveExercise(ex.id as any)}
+                        onClick={() => setActiveExercise(ex.id as ExerciseType)}
                         className="group flex items-center justify-between p-5 rounded-[2rem] bg-white border border-slate-100 hover:border-brand-teal hover:shadow-xl hover:shadow-brand-teal/5 transition-all text-left"
                       >
                         <div className="flex items-center gap-4">

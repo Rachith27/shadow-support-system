@@ -19,7 +19,7 @@ import { API_BASE } from '@/lib/api';
 export default function InterventionGuide() {
   const { id } = useParams();
   const router = useRouter();
-  const [caseData, setCaseData] = useState<any>(null);
+  const [caseData, setCaseData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
@@ -119,7 +119,7 @@ export default function InterventionGuide() {
                 <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Context</h3>
              </div>
              <h2 className="text-xl font-bold text-gray-800 mb-4 leading-tight">{caseData.detected_concern}</h2>
-             <p className="text-sm text-gray-500 leading-relaxed italic mb-6">"{caseData.ai_summary}"</p>
+             <p className="text-sm text-gray-500 leading-relaxed italic mb-6">&quot;{caseData.ai_summary}&quot;</p>
              
              <div className="pt-6 border-t border-gray-50 space-y-4">
                 <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest">
@@ -164,7 +164,7 @@ export default function InterventionGuide() {
                                <ShieldCheck size={12}/> Human Protocol
                             </p>
                             <p className="text-[11px] font-bold leading-relaxed text-white italic">
-                               "Coordinate support via the Safe Chat interface first. Attempt to resolve or de-escalate through text before placing a voice call."
+                               &quot;Coordinate support via the Safe Chat interface first. Attempt to resolve or de-escalate through text before placing a voice call.&quot;
                             </p>
                          </div>
                       </div>
@@ -201,7 +201,7 @@ export default function InterventionGuide() {
                      <div className="pt-4 border-t border-white/10">
                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Internal Staff Notes</p>
                         <p className="text-sm italic leading-relaxed text-indigo-100">
-                           "{caseData.reportContext.notes || 'No specific notes provided.'}"
+                           &quot;{caseData.reportContext.notes || 'No specific notes provided.'}&quot;
                         </p>
                      </div>
                   </div>
@@ -278,7 +278,7 @@ export default function InterventionGuide() {
                     {(g.whatToSay || []).map((t: string, i: number) => (
                        <div key={i} className="bg-gray-50 p-5 rounded-2xl flex items-start gap-3 border border-gray-100/50">
                           <MessageSquare size={18} className="text-sky-400 mt-1 flex-shrink-0" />
-                          <p className="text-gray-700 font-bold italic">"{t}"</p>
+                          <p className="text-gray-700 font-bold italic">&quot;{t}&quot;</p>
                        </div>
                     ))}
                  </div>
@@ -306,7 +306,7 @@ export default function InterventionGuide() {
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
                  <div className="flex items-center gap-3 mb-6">
                    <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-black"><XSquare size={18}/></div>
-                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-800">Don'ts</h3>
+                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-800">Don&apos;ts</h3>
                  </div>
                  <ul className="space-y-4">
                     {(g.donts || []).map((item: string, i: number) => (
@@ -326,7 +326,7 @@ export default function InterventionGuide() {
               <div>
                  <p className="text-sm font-bold text-amber-800 tracking-tight">Timely Support Matters</p>
                  <p className="text-xs text-amber-700/80 mt-1 leading-relaxed">
-                   If the situation seems critical or presents immediate danger, follow your local NGO's physical escalation protocol immediately.
+                   If the situation seems critical or presents immediate danger, follow your local NGO&apos;s physical escalation protocol immediately.
                  </p>
               </div>
            </div>

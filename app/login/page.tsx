@@ -38,8 +38,8 @@ export default function LoginPage() {
       localStorage.setItem("user_age", data.user.age_group);
 
       router.push("/safe-chat");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }

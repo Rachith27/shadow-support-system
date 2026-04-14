@@ -92,7 +92,7 @@ export default function CognitiveReframe({ sessionId, lastUserMessage, onComplet
                  <Sparkles size={20} className="text-indigo-400" />
               </div>
               <p className="text-indigo-900 font-bold text-lg leading-relaxed italic">
-                "{reframed}"
+                &quot;{reframed}&quot;
               </p>
            </div>
            

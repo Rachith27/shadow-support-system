@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { supabaseAdmin } from '../../lib/supabase';
+import { prisma } from '../../lib/prisma';
 import { AuthRequest, auth } from '../middleware/auth';
 
 const router = Router();
@@ -16,34 +16,31 @@ router.post('/register', async (req, res) => {
        return res.status(400).json({ error: "Missing required fields." });
     }
 
-    // 1. Check if email already registered in Supabase
-    const { data: existing, error: checkErr } = await supabaseAdmin
-      .from('volunteers')
-      .select('email')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (checkErr) console.error("Check existing error:", checkErr);
-
-    if (existing) return res.status(400).json({ error: 'Email already registered.' });
+    // 1. Check if email already registered in Prisma
+    try {
+        const existing = await prisma.volunteer.findUnique({ where: { email } });
+        if (existing) return res.status(400).json({ error: 'Email already registered.' });
+    } catch (checkErr) {
+        console.error("Check existing error:", checkErr);
+    }
 
     // 2. Create entry in volunteers table with 'pending' status
-    const { error } = await supabaseAdmin
-      .from('volunteers')
-      .insert({
-        full_name: fullName,
-        email,
-        phone,
-        location,
-        skills,
-        availability,
-        motivation,
-        password, // Note: Plaintext as per original prototype, should be hashed in production
-        status: 'pending'
-      });
-
-    if (error) {
-        console.error("Supabase Register Error:", error);
+    try {
+        await prisma.volunteer.create({
+            data: {
+                full_name: fullName,
+                email,
+                phone,
+                location,
+                skills,
+                availability,
+                motivation,
+                password, // Note: Plaintext as per original prototype, should be hashed in production
+                status: 'pending'
+            }
+        });
+    } catch (error) {
+        console.error("Prisma Register Error:", error);
         return res.status(500).json({ error: 'Registration failed.' });
     }
     
@@ -60,14 +57,11 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email and password required." });
 
-    const { data: vol, error } = await supabaseAdmin
-      .from('volunteers')
-      .select('*')
-      .eq('email', email)
-      .eq('password', password)
-      .single();
+    const vol = await prisma.volunteer.findFirst({
+        where: { email, password }
+    });
 
-    if (error || !vol) return res.status(401).json({ error: 'Invalid email or password.' });
+    if (!vol) return res.status(401).json({ error: 'Invalid email or password.' });
     
     if (vol.status === 'pending') return res.status(403).json({ error: 'Account pending admin approval.' });
     if (vol.status === 'rejected') return res.status(403).json({ error: 'Account rejected.' });
@@ -91,22 +85,20 @@ router.get('/me', auth, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { data: vol, error: volError } = await supabaseAdmin
-      .from('volunteers')
-      .select('*')
-      .eq('id', req.user.id)
-      .single();
+    const vol = await prisma.volunteer.findUnique({
+      where: { id: req.user.id }
+    });
 
-    if (volError || !vol) return res.status(404).json({ error: 'Volunteer not found' });
+    if (!vol) return res.status(404).json({ error: 'Volunteer not found' });
     
     // Fetch all pending flagged cases for the volunteer to see
-    const { data: cases, error: casesError } = await supabaseAdmin
-      .from('flagged_cases')
-      .select('*')
-      .eq('intervention_status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (casesError) {
+    let cases: Record<string, unknown>[] = [];
+    try {
+        cases = await prisma.flaggedCase.findMany({
+            where: { intervention_status: 'pending' },
+            orderBy: { created_at: 'desc' }
+        });
+    } catch (casesError) {
         console.error("Dashboard Fetch Error:", casesError);
     }
     
