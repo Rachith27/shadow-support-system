@@ -129,7 +129,7 @@ export default function ChatInterface({
         role: 'assistant', // Render as assistant but maybe add a flag
         text: data.text,
         timestamp: Date.now(),
-        // @ts-expect-error adding custom property to interface intentionally
+        
         isVolunteer: true,
         volunteerName: data.volunteerName
       }]);

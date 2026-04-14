@@ -55,13 +55,13 @@ function GlobalNotificationToast({
 }
 
 export default function VolunteerLayout({ children }: { children: React.ReactNode }) {
-  const [notification, setNotification] = useState<Record<string, unknown> | null>(null);
+  const [notification, setNotification] = useState<{ studentName: string; riskLevel: string; sessionId: string } | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
     const socket = getSocket();
     
-    socket.on('new_intervention_needed', (data: Record<string, unknown>) => {
+    socket.on('new_intervention_needed', (data: { studentName: string; riskLevel: string; sessionId: string }) => {
        console.log('🚨 Global alert received:', data);
        // Don't show if already viewing cases? 
        // Actually showing it everywhere is safer.

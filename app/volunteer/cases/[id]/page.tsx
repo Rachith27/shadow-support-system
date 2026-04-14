@@ -16,10 +16,44 @@ import {
 import VolunteerChat from '@/components/volunteer/VolunteerChat';
 import { API_BASE } from '@/lib/api';
 
+interface SessionContext {
+  user_name?: string;
+  age_group?: string;
+  phone?: string;
+}
+
+interface ReportContext {
+  student_name?: string;
+  student_age?: number;
+  school_name?: string;
+  student_phone?: string;
+  notes?: string;
+}
+
+interface Guidance {
+  approach?: string;
+  whatToSay?: string[];
+  dos?: string[];
+  donts?: string[];
+}
+
+interface CaseData {
+  id: string;
+  detected_concern?: string;
+  ai_summary?: string;
+  risk_level?: string;
+  intervention_status?: string;
+  age_group?: string;
+  session_id?: string;
+  guidance?: Guidance;
+  sessionContext?: SessionContext;
+  reportContext?: ReportContext;
+}
+
 export default function InterventionGuide() {
   const { id } = useParams();
   const router = useRouter();
-  const [caseData, setCaseData] = useState<Record<string, unknown> | null>(null);
+  const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
@@ -86,7 +120,7 @@ export default function InterventionGuide() {
     </div>
   );
 
-  const g = caseData.guidance || {};
+  const g: Guidance = caseData.guidance || {};
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

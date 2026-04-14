@@ -33,6 +33,18 @@ interface InsightSession {
   chat_type?: string;
 }
 
+interface BehaviorReport {
+  id: string;
+  student_name?: string;
+  student_age?: number;
+  school_name?: string;
+  student_phone?: string;
+  mood?: string;
+  behavior_changes?: string[];
+  notes?: string;
+  timestamp: string;
+}
+
 interface DashboardData {
   totalSessions: number;
   totalBehaviorReports: number;
@@ -42,7 +54,7 @@ interface DashboardData {
   ageInsights: Record<string, number>;
   recentInsights: InsightSession[];
   volunteers: Volunteer[];
-  behaviorReports: Record<string, unknown>[];
+  behaviorReports: BehaviorReport[];
   exerciseAdherence: number;
 }
 
@@ -55,7 +67,7 @@ interface DashboardResponse {
   ageInsights?: Record<string, number>;
   recentInsights?: InsightSession[];
   volunteers?: { id: string; fullName?: string; full_name?: string; email: string; status: string; location?: string; phone?: string; motivation?: string; skills?: string[] }[];
-  behaviorReports?: Record<string, unknown>[];
+  behaviorReports?: BehaviorReport[];
   exerciseAdherence?: number;
 }
 
@@ -399,7 +411,7 @@ export default function AdminDashboard() {
                          <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Behavior Changes</p>
                             <div className="flex flex-wrap gap-2">
-                               {(r.behavior_changes || []).map((c: string) => (
+                               {(r.behavior_changes || []).map((c) => (
                                  <span key={c} className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-100">{c}</span>
                                ))}
                             </div>

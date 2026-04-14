@@ -6,8 +6,18 @@ import { ArrowLeft, CheckCircle, Sparkles } from 'lucide-react';
 import EventCard from '@/components/EventCard';
 import { API_BASE } from '@/lib/api';
 
+interface EventItem {
+  id: string;
+  topic_category: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  interested_count: number;
+}
+
 function EventsContent() {
-  const [events, setEvents] = useState<Record<string, unknown>[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [registered, setRegistered] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const searchParams = useSearchParams();

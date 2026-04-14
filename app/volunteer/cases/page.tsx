@@ -7,8 +7,18 @@ import CaseCard from '@/components/CaseCard';
 import { API_BASE } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 
+interface CaseItem {
+  id: string;
+  risk_level: 'low' | 'medium' | 'high';
+  age_group: string;
+  detected_concern: string;
+  ai_summary?: string;
+  created_at: string;
+  intervention_status: string;
+}
+
 export default function VolunteerCases() {
-  const [cases, setCases] = useState<Record<string, unknown>[]>([]);
+  const [cases, setCases] = useState<CaseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
@@ -54,7 +64,7 @@ export default function VolunteerCases() {
 
     const socket = getSocket();
     
-    socket.on('new_intervention_needed', (data: Record<string, unknown>) => {
+    socket.on('new_intervention_needed', (data: { caseId?: string }) => {
        console.log('🚨 Background refresh triggered by new case:', data);
        
        // Auto-fetch new data to show at top
